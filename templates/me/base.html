@@ -32,7 +32,7 @@
     document.getElementById('me-avatar').textContent = (u.name || '帧').slice(0, 1);
     document.getElementById('me-name').textContent = u.name || '同学';
     document.getElementById('me-sub').textContent =
-      `${levelBadge(me.data.level || 1)} · ${u.tier_name || '免费版'} · ${u.credit_score}信用`;
+      `${levelBadge(me.data.level || 1)} · ${u.tier_name || 'Free'} · ${u.credit_score}信用`;
     document.getElementById('me-coin').textContent = (u.tokens || 0) + ' Token';
   }
 })();

@@ -86,12 +86,12 @@
   <div class="push-grid">
     <div class="push-card"><b>灵感工作流精选</b><p id="push-design">加载中…</p></div>
     <div class="push-card"><b>充值 / 订阅</b>
-      <p>免费版每天 5 次灵感、1GB 空间；Token 升级「创作 Plus」可扩容提速。</p>
+      <p>Free 免费 30 次生成获客；升级 Pro / Team 扩容提速、拉客单。</p>
       <a class="btn btn-coin btn-sm" style="margin-top:10px;display:inline-block" href="/me/recharge">去充值升级</a>
     </div>
   </div>
 
-  <h2 class="section-title">专业工具平台 · 跳转官方软件创作（未安装先到官网下载）</h2>
+  <h2 class="section-title">专业工具平台 · 桌面创作</h2>
   <div class="grid cols-3" id="tools"></div>
 
   <h2 class="section-title">创作资源导航 · 灵感 / 字体 / 图库 / 图标 / 免抠（外链直达）</h2>
@@ -179,12 +179,36 @@ async function saveWorkflow() {
 async function loadTools() {
   const res = await API.get('/create/api/tools');
   if (res.code !== 0) return;
-  document.getElementById('tools').innerHTML = res.data.map(t => `
-    <div class="card" style="padding:20px;cursor:pointer" onclick="window.open('${t.url}','_blank')">
+  window._tools = res.data;
+  document.getElementById('tools').innerHTML = res.data.map((t, i) => `
+    <div class="card tool-card" style="padding:20px;cursor:pointer" onclick="launchTool(${i})">
       <b>${API.esc(t.name)}</b>
       <p class="muted" style="margin-top:8px;line-height:1.7">${API.esc(t.desc)}</p>
-      <p style="margin-top:10px;color:var(--acc-create);font-size:13px;font-weight:600">前往软件官网 / 下载 →</p>
+      <p style="margin-top:10px;color:var(--acc-create);font-size:13px;font-weight:600">启动桌面平台 →</p>
     </div>`).join('');
+}
+
+/* 先尝试用私有协议唤起桌面平台；若系统未安装（无 blur/hidden 信号），
+   超时后自动跳转官方下载页兜底。 */
+function launchTool(i) {
+  const t = (window._tools || [])[i];
+  if (!t) return;
+  let launched = false;
+  const fail = setTimeout(() => {
+    if (launched) return;
+    API.toast('未检测到桌面平台，正在跳转下载页…');
+    window.open(t.url, '_blank');
+  }, 1600);
+  const onLeave = () => { launched = true; clearTimeout(fail); };
+  window.addEventListener('blur', onLeave, {once: true});
+  document.addEventListener('visibilitychange', function vh() {
+    if (document.hidden) { onLeave(); document.removeEventListener('visibilitychange', vh); }
+  });
+  const fr = document.createElement('iframe');
+  fr.style.display = 'none';
+  fr.src = t.proto || t.url;
+  document.body.appendChild(fr);
+  setTimeout(() => fr.remove(), 2500);
 }
 
 async function uploadWork() {

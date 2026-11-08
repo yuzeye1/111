@@ -24,12 +24,13 @@ create_bp = Blueprint('create', __name__, url_prefix='/create')
 
 ALLOWED_EXT = {'jpg', 'jpeg', 'png', 'webp', 'psd', 'ai', 'pdf'}
 
+# 外部专业工具：proto 为桌面端唤起协议，url 为唤不起时的下载页兜底
 EXTERNAL_TOOLS = [
-    {'name': '悟空图像', 'url': 'https://www.photosir.com/',
-     'desc': '亦心科技官方图像软件 · 官网下载安装，海报与文创 AI 闪绘'},
-    {'name': '即梦', 'url': 'https://jimeng.jianying.com/',
+    {'name': '悟空图像', 'proto': 'wukongimage://', 'url': 'https://www.photosir.com/',
+     'desc': '亦心科技官方图像软件 · 海报与文创 AI 闪绘'},
+    {'name': '即梦', 'proto': 'jimeng://', 'url': 'https://jimeng.jianying.com/',
      'desc': '多风格出图，适合新媒体视觉'},
-    {'name': 'LibLib', 'url': 'https://www.liblib.art/',
+    {'name': 'LibLib', 'proto': 'liblib://', 'url': 'https://www.liblib.art/',
      'desc': '模型社区，适合三维写实与产品渲染'},
 ]
 

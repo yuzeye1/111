@@ -43,6 +43,14 @@
 {% endblock %}
 {% block scripts %}
 <script>
+/* 裂变落地：记录邀请码，注册成功后双向发奖依据 */
+(function () {
+  const inv = new URLSearchParams(location.search).get('inv');
+  if (inv) {
+    localStorage.setItem('fl_ref_inv', inv);
+    setTimeout(() => API.toast('已应用邀请码 ' + inv + '：注册成功加 5 次生成'), 600);
+  }
+})();
 const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 function countdown() {

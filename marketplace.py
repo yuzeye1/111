@@ -15,7 +15,8 @@ from databaseinit import (Announcement, Application, Artwork, Client, Comment,
                           FEEDBACK_TOKEN_AWARD, InspireCall, Like,
                           Material, Order, OrderRecord, RECHARGE_PACKAGES,
                           RechargeLog, Review, SkillTag, TeachingEval,
-                          TIER_CONFIG, TIER_TOKEN_PRICE, User, WorkflowCase,
+                          TIER_CONFIG, TIER_RMB_PRICE, TIER_TOKEN_PRICE, User,
+                          WorkflowCase,
                           db)
 from matching import (aesthetic_avg, match_score, review_avg, stability,
                       user_level)
@@ -544,12 +545,14 @@ def wallet():
                    'tier_config': TIER_CONFIG,
                    'packages': RECHARGE_PACKAGES,
                    'tier_token_price': TIER_TOKEN_PRICE,
+                   'tier_rmb_price': TIER_RMB_PRICE,
                    'logged_in': False})
     return ok({'tokens': user.tokens, 'tier': user.tier,
                'tier_name': TIER_CONFIG[user.tier or 0]['name'],
                'tier_config': TIER_CONFIG,
                'packages': RECHARGE_PACKAGES,
                'tier_token_price': TIER_TOKEN_PRICE,
+               'tier_rmb_price': TIER_RMB_PRICE,
                'storage_free': TIER_CONFIG[user.tier or 0]['storage_gb'],
                'logged_in': True})
 
@@ -600,6 +603,39 @@ def upgrade(user):
               % (TIER_CONFIG[tier]['name'],
                  TIER_CONFIG[tier]['storage_gb'],
                  TIER_CONFIG[tier]['inspire_daily']))
+
+
+@main_bp.post('/api/market/subscribe')
+@login_required
+def subscribe(user):
+    """人民币订阅升级（演示支付：直接开通并留痕）。
+
+    Pro：49 元/月 或 399 元/年；Team：199 元/月（含 5 席）。
+    """
+    data = request.get_json(force=True)
+    tier = int(data.get('tier') or 0)
+    cycle = 'year' if data.get('cycle') == 'year' else 'month'
+    if tier not in (1, 2):
+        return err(400, '档位不合法')
+    prices = TIER_RMB_PRICE[tier]
+    if cycle not in prices:
+        return err(400, '该档位暂不支持年付')
+    if user.tier > tier:
+        return err(400, '你已是 %s 或更高档位' % TIER_CONFIG[user.tier]['name'])
+    price = prices[cycle]
+    user.tier = tier
+    cycle_cn = {'month': '月付', 'year': '年付'}[cycle]
+    note = '订阅 %s · %s%s' % (TIER_CONFIG[tier]['name'], cycle_cn,
+                              ' · 5席' if tier == 2 else '')
+    db.session.add(RechargeLog(user_id=user.id, kind='upgrade', tokens=0,
+                               amount=price, note=note))
+    db.session.commit()
+    return ok({'tokens': user.tokens, 'tier': tier},
+              '已开通 %s（%s）：空间 %dGB · 灵感每日 %d 次%s'
+              % (TIER_CONFIG[tier]['name'], cycle_cn,
+                 TIER_CONFIG[tier]['storage_gb'],
+                 TIER_CONFIG[tier]['inspire_daily'],
+                 ' · 5 席协作' if tier == 2 else ''))
 
 
 @main_bp.get('/api/market/recharge/records')

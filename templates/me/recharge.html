@@ -2,27 +2,75 @@
 {% set me_nav = 'recharge' %}
 {% block me_content %}
 <h2 style="color:var(--c-client-5)">充值 / 升级 · 金币 Token</h2>
-<p class="muted" style="margin:8px 0 20px">Token 用于订阅升级与灵感加次；演示环境为模拟支付，直接入账。</p>
+<p class="muted" style="margin:8px 0 20px">Token 用于灵感加次；演示环境为模拟支付，直接入账。</p>
 
 <!-- 充值套餐 -->
 <div class="grid cols-3" id="packs"></div>
 <div id="pay-row" style="margin-top:18px"></div>
 
-<h2 class="section-title">升级系统 · 订阅</h2>
-<div class="grid cols-3" id="tiers"></div>
+<h2 class="section-title">会员方案 · 商业定价</h2>
+<div class="grid cols-3" id="plans"></div>
+
+<h2 class="section-title">双向推荐 · 低门槛裂变</h2>
+<div class="ref-card glowline" id="referral"></div>
+
+<h2 class="section-title">限时幸运转盘 · 科技游戏化</h2>
+<div class="wheel-row">
+  <div id="wheel-box"></div>
+  <div class="wheel-side">
+    <b style="color:var(--gold)">今日奖池</b>
+    <ul id="prize-list"></ul>
+    <p class="muted" id="wheel-hint"></p>
+  </div>
+</div>
+<div class="card" style="padding:20px;margin-top:18px" id="coupons"></div>
 
 <h2 class="section-title">充值记录</h2>
 <div class="card" style="padding:20px" id="records"></div>
+
+<!-- 抽奖结果卡 -->
+<div class="prize-mask" id="prize-mask" hidden>
+  <div class="prize-modal">
+    <p class="pm-tag" id="pm-tag">恭喜中奖</p>
+    <div class="pm-discount" id="pm-discount"></div>
+    <p class="pm-scope" id="pm-scope"></p>
+    <p class="pm-code" id="pm-code"></p>
+    <div class="pm-actions">
+      <button class="btn btn-coin" id="pm-claim">领取</button>
+      <button class="btn btn-ghost" onclick="closePrize()">关闭</button>
+    </div>
+  </div>
+</div>
 {% endblock %}
 {% block me_scripts %}
+<script src="/static/js/wheel.js"></script>
 <script>
-let wallet = null, picked = null;
+let wallet = null, picked = null, me = null, proCycle = 'month', wheel = null, lastPrize = null;
+
+/* ---------- 会员定价（Free 获客 / Pro 盈利 / Team 拉客单） ---------- */
+const PLAN_META = {
+  0: {tag: '获客', cta: '免费开用', bullets: [
+    '注册即得 30 次免费 AI 生成',
+    '1GB 云端空间 · 灵感每日 5 次',
+    '作品广场标准展示']},
+  1: {tag: '盈利', cta: '订阅 Pro', bullets: [
+    '3GB 云端空间 · 灵感每日 15 次',
+    '作品广场优先曝光',
+    '年付仅 ¥399，立省 ¥198',
+    '抽奖折扣券可叠加使用']},
+  2: {tag: '拉客单', cta: '订阅 Team', bullets: [
+    '10GB 云端空间 · 灵感每日 30 次',
+    '5 席团队协作 · 共享作品集',
+    '商单派单直通 + 案例置顶',
+    '专属客服通道']},
+};
 
 async function loadWallet() {
   const res = await API.get('/api/market/wallet');
   if (res.code !== 0) return;
   wallet = res.data;
-  renderPacks(); renderTiers(); loadRecords();
+  me = await API.ensureLogin();
+  renderPacks(); renderPlans(); renderReferral(); loadRecords();
 }
 
 function renderPacks() {
@@ -49,35 +97,147 @@ async function recharge() {
   refreshMeCoin();
 }
 
-function renderTiers() {
-  const cfg = wallet.tier_config, prices = wallet.tier_token_price || {};
-  document.getElementById('tiers').innerHTML = [0, 1, 2].map(t => `
-    <div class="tier-card ${wallet.tier === t ? 'current' : ''}">
-      <h4>${cfg[t].name} ${wallet.tier === t ? '<span class="chip on" style="font-size:11px">当前</span>' : ''}</h4>
-      ${t === 0 ? '<p class="muted">注册即得</p>' : `<p style="color:var(--gold);font-weight:700">${prices[t]} Token / 月</p>`}
-      <ul><li>云端空间 ${cfg[t].storage_gb}GB</li>
-          <li>灵感方案每日 ${cfg[t].inspire_daily} 次</li>
-          <li>${t >= 1 ? '作品广场优先曝光' : '作品广场标准展示'}</li>
-          <li>${t === 2 ? '工作流案例置顶推荐' : '按曝光度推荐'}</li></ul>
-      ${t > wallet.tier && t > 0 ? `
-        <button class="btn" style="width:100%" onclick="upgrade(${t})">
-          用 ${prices[t]} Token 升级</button>` : ''}
-    </div>`).join('');
+function renderPlans() {
+  const cfg = wallet.tier_config, rmb = wallet.tier_rmb_price || {};
+  document.getElementById('plans').innerHTML = [0, 1, 2].map(t => {
+    const cur = wallet.tier === t, m = PLAN_META[t];
+    const price = t === 0 ? 0 : rmb[t][proCycle === 'year' && rmb[t].year ? 'year' : 'month'];
+    const cycleTxt = t === 0 ? '永久免费' : (rmb[t].year && proCycle === 'year' ? '/ 年' : '/ 月');
+    return `
+    <div class="plan-card ${t === 1 ? 'hot glowline' : ''} ${cur ? 'current' : ''}" data-tilt>
+      ${t === 1 ? '<span class="plan-tag">推荐</span>' : ''}
+      <div class="plan-head"><b class="plan-name">${cfg[t].name}</b>
+        <span class="chip ${t === 0 ? '' : t === 1 ? 'chip-create' : 'chip-client'}" style="font-size:11px">${m.tag}</span></div>
+      <div class="plan-price">¥ ${price}<small> ${cycleTxt}</small></div>
+      ${t === 2 ? '<p class="muted" style="margin:-4px 0 0">含 5 席团队席位</p>' : ''}
+      ${t === 1 ? `
+      <div class="cyc-row">
+        <button class="cyc-btn ${proCycle === 'month' ? 'on' : ''}" onclick="setCycle('month')">月付 ¥${rmb[1].month}</button>
+        <button class="cyc-btn ${proCycle === 'year' ? 'on' : ''}" onclick="setCycle('year')">年付 ¥${rmb[1].year}<small>省¥198</small></button>
+      </div>` : ''}
+      <ul class="plan-ul">${m.bullets.map(b => `<li>${b}</li>`).join('')}
+        <li>云端空间 ${cfg[t].storage_gb}GB · 灵感每日 ${cfg[t].inspire_daily} 次</li></ul>
+      ${cur ? '<button class="btn btn-ghost" disabled style="width:100%">当前方案</button>'
+            : t === 0 ? '<button class="btn btn-ghost" style="width:100%" onclick="API.toast(\'注册即享 30 次免费生成\', true)">' + m.cta + '</button>'
+            : `<button class="btn btn-coin" style="width:100%" onclick="subscribe(${t})">${m.cta}（演示支付）</button>`}
+    </div>`;
+  }).join('');
 }
 
-async function upgrade(t) {
-  const me = await API.ensureLogin();
-  if (!me) return location.href = '/login';
-  const res = await API.post('/api/market/upgrade', {tier: t});
+function setCycle(c) { proCycle = c; renderPlans(); }
+
+async function subscribe(t) {
+  if (!me) { location.href = '/login'; return; }
+  const cycle = t === 1 ? proCycle : 'month';
+  const res = await API.post('/api/market/subscribe', {tier: t, cycle});
   if (res.code !== 0) return API.toast(res.msg, false);
   API.toast(res.msg);
   loadWallet();
   refreshMeCoin();
 }
 
+/* ---------- 双向推荐 · 低门槛裂变 ---------- */
+function refCode() {
+  if (me) return 'FL' + me.id.toString(36).toUpperCase().padStart(4, '0');
+  let g = localStorage.getItem('fl_guest_code');
+  if (!g) { g = 'FLG' + Math.random().toString(36).slice(2, 7).toUpperCase(); localStorage.setItem('fl_guest_code', g); }
+  return g;
+}
+
+function renderReferral() {
+  const code = refCode();
+  const link = location.origin + '/register?inv=' + code;
+  const invited = +(localStorage.getItem('fl_ref_count') || 0);
+  document.getElementById('referral').innerHTML = `
+    <div class="ref-left">
+      <b style="font-size:15px">我的邀请码 <span style="color:var(--gold);letter-spacing:2px">${code}</span></b>
+      <p class="muted" style="margin:8px 0 12px;line-height:1.8">好友经你的链接注册并首创成功：<b style="color:var(--text)">你得 Pro 7 天体验 + 10 次生成</b>；<b style="color:var(--text)">好友注册即加 5 次生成</b>。双向得利，无门槛裂变。</p>
+      <div class="ref-link"><code>${link}</code></div>
+      <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn btn-sm btn-coin" onclick="copyText('${link}','邀请链接已复制')">复制邀请链接</button>
+        <button class="btn btn-sm btn-ghost" onclick="copyText('${code}','邀请码已复制')">复制邀请码</button>
+      </div>
+    </div>
+    <div class="ref-right">
+      <div class="ref-stat"><b>${invited}</b><span>已邀请好友</span></div>
+      <div class="ref-stat"><b>${invited * 10}</b><span>累计获赠次数</span></div>
+      <div class="ref-stat"><b>双向</b><span>推荐奖励模式</span></div>
+    </div>`;
+}
+
+function copyText(txt, msg) {
+  if (navigator.clipboard) navigator.clipboard.writeText(txt).then(() => API.toast(msg));
+  else { prompt('手动复制：', txt); }
+}
+
+/* ---------- 幸运转盘 ---------- */
+const PRIZES = [
+  {label: 'Pro月付 9折', discount: '9 折', scope: 'Pro 月付订阅', code: 'PRO-M10'},
+  {label: 'AI加次 +3', discount: '+3 次', scope: 'AI 生成加次', code: 'GEN-3'},
+  {label: 'Pro年付 85折', discount: '85 折', scope: 'Pro 年付订阅', code: 'PRO-Y15'},
+  {label: '立减 ¥5', discount: '¥5', scope: '任意订阅 / 充值', code: 'CASH-5'},
+  {label: 'Team月付 88折', discount: '88 折', scope: 'Team 月付订阅', code: 'TEAM-M12'},
+  {label: '谢谢参与', discount: null, scope: '', code: ''},
+];
+
+function initWheel() {
+  document.getElementById('prize-list').innerHTML =
+    PRIZES.map(p => `<li>${p.discount ? p.label + '（' + p.discount + '）' : p.label}</li>`).join('');
+  wheel = FrameWheel.mount(document.getElementById('wheel-box'), PRIZES, onPrize);
+  const today = new Date().toDateString();
+  if (localStorage.getItem('fl_wheel_date') === today) {
+    wheel.hub.disabled = true;
+    document.getElementById('wheel-hint').textContent = '今日已抽取，明天再来攒手气。';
+  } else {
+    document.getElementById('wheel-hint').textContent = '每日 1 次免费抽取，折扣券订阅时自动可用。';
+  }
+  renderCoupons();
+}
+
+function onPrize(p) {
+  lastPrize = p;
+  localStorage.setItem('fl_wheel_date', new Date().toDateString());
+  wheel.hub.disabled = true;
+  document.getElementById('wheel-hint').textContent = '今日已抽取，明天再来攒手气。';
+  const mask = document.getElementById('prize-mask');
+  document.getElementById('pm-tag').textContent = p.discount ? '恭喜中奖' : '差一点';
+  document.getElementById('pm-discount').textContent = p.discount || '谢谢参与';
+  document.getElementById('pm-scope').textContent = p.discount ? '适用范围：' + p.scope : '明天再来，手气会更好的';
+  document.getElementById('pm-code').textContent = p.discount ? '券码 ' + p.code : '';
+  document.getElementById('pm-claim').style.display = p.discount ? '' : 'none';
+  mask.hidden = false;
+}
+
+function closePrize() { document.getElementById('prize-mask').hidden = true; }
+
+function myCoupons() {
+  try { return JSON.parse(localStorage.getItem('fl_coupons') || '[]'); } catch (e) { return []; }
+}
+
+document.getElementById('pm-claim').addEventListener('click', () => {
+  if (!lastPrize || !lastPrize.code) return closePrize();
+  const list = myCoupons();
+  if (!list.some(c => c.code === lastPrize.code)) {
+    list.unshift({code: lastPrize.code, discount: lastPrize.discount, scope: lastPrize.scope, date: new Date().toISOString().slice(0, 10)});
+    localStorage.setItem('fl_coupons', JSON.stringify(list));
+  }
+  API.toast('已领取：' + lastPrize.discount + ' 券');
+  closePrize();
+  renderCoupons();
+});
+
+function renderCoupons() {
+  const list = myCoupons();
+  document.getElementById('coupons').innerHTML = list.length ? `
+    <b style="font-size:14px">我的折扣券</b>
+    <div class="coupon-row" style="margin-top:12px">
+      ${list.map(c => `<span class="coupon-chip"><b>${API.esc(c.discount)}</b>${API.esc(c.scope)}<small>${API.esc(c.code)}</small></span>`).join('')}
+    </div>` : '<p class="muted">还没有折扣券，转转转盘或邀请好友都能拿券。</p>';
+}
+
+/* ---------- 充值记录 ---------- */
 async function loadRecords() {
   const box = document.getElementById('records');
-  const me = await API.ensureLogin();
   if (!me) { box.innerHTML = '<p class="muted">登录后查看充值与订阅记录。</p>'; return; }
   const res = await API.get('/api/market/recharge/records');
   if (res.code !== 0) return;
@@ -90,5 +250,6 @@ async function loadRecords() {
 }
 
 loadWallet();
+initWheel();
 </script>
 {% endblock %}
