@@ -56,6 +56,15 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(admin_bp)
 
 
+# 静态资源版本号：CSS/JS 有更新时改这里，模板引用会带 ?v= 强制浏览器重新下载
+STATIC_VER = '20261108'
+
+
+@app.context_processor
+def _inject_static_ver():
+    return {'static_v': STATIC_VER}
+
+
 @app.errorhandler(404)
 def not_found(_):
     return err(404, '接口不存在')

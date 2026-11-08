@@ -57,7 +57,7 @@
 <div class="card" style="padding:20px" id="trace-box"></div>
 {% endblock %}
 {% block me_scripts %}
-<script src="/static/js/dial.js"></script>
+<script src="/static/js/dial.js?v={{ static_v }}"></script>
 <script>
 new FrameDial(document.getElementById('me-dial'), {
   sectors: [
