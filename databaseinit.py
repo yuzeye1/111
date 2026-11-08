@@ -26,12 +26,18 @@ ANALYSIS_KEYS = ['构图亮点', '色彩逻辑', '视觉层级', '美学韵律',
 
 ORDER_FLOW = ['pending', 'accepted', 'delivered', 'reviewed', 'settled']
 
-# 订阅档位：空间与每日灵感次数随档位提升（新设计稿：升级系统）
+# 订阅档位：商业定价模型（Free 免费获客 / Pro 盈利 / Team 拉客单）
 TIER_CONFIG = {
-    0: {'name': '免费版', 'price': 0, 'storage_gb': 1, 'inspire_daily': 5},
-    1: {'name': '创作 Plus', 'price': 12, 'storage_gb': 3, 'inspire_daily': 15},
-    2: {'name': '工作室版', 'price': 30, 'storage_gb': 10, 'inspire_daily': 30},
+    0: {'name': 'Free', 'price': 0, 'storage_gb': 1, 'inspire_daily': 5,
+        'free_quota': 30, 'seats': 1},
+    1: {'name': 'Pro', 'price': 49, 'storage_gb': 3, 'inspire_daily': 15,
+        'seats': 1},
+    2: {'name': 'Team', 'price': 199, 'storage_gb': 10, 'inspire_daily': 30,
+        'seats': 5},
 }
+
+# 人民币定价：Pro 支持月付/年付，Team 仅月付（含 5 席）
+TIER_RMB_PRICE = {1: {'month': 49, 'year': 399}, 2: {'month': 199}}
 
 # 充值套餐（新设计稿：金币 Token）
 RECHARGE_PACKAGES = [
@@ -84,20 +90,24 @@ def init_db(app):
 
 
 def _ensure_admin(app):
-    """生产首次部署：无用户时按 env 创建管理员账号（可选）。"""
+    """生产首次部署：无该账号时按 env 创建管理员（可选，多 worker 并发安全）。"""
     import os
 
-    if User.query.first() is not None:
-        return
     email = (os.getenv('ADMIN_EMAIL') or '').strip()
     password = os.getenv('ADMIN_PASSWORD') or ''
     if not email or not password:
+        return
+    if User.query.filter_by(email=email).first() is not None:
         return
     admin = User(email=email, name='管理员', role='teacher',
                  verified=True, email_verified=True, is_admin=True)
     admin.set_password(password)
     db.session.add(admin)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception:
+        # 多 worker 并发首启：另一进程已抢先创建同名管理员，放弃即可
+        db.session.rollback()
 
 
 # ---------- 用户与技能标签 ----------
