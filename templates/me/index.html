@@ -1,0 +1,272 @@
+{% extends 'me/base.html' %}
+{% set me_nav = 'home' %}
+{% block me_content %}
+<!-- 中部：转盘分区快速跳转子模块 -->
+<div class="card" style="padding:26px;display:flex;gap:28px;align-items:center;flex-wrap:wrap">
+  <div id="me-dial" style="flex:none;width:min(320px,72vw);height:min(320px,72vw)"></div>
+  <div style="flex:1;min-width:220px">
+    <b style="font-size:16px;color:var(--c-client-5)">个人中心 · 转盘导航</b>
+    <p class="muted" style="margin-top:8px;line-height:1.9">拖拽旋转，点击分区直达对应模块。</p>
+  </div>
+</div>
+
+<h2 style="color:var(--c-client-5)">使用分析</h2>
+<div class="stat-ring" id="stats"></div>
+<div class="card" style="padding:24px;margin-top:16px">
+  <b>能力圆环（相对平台基准）</b>
+  <div class="arc-chart" id="arcs"></div>
+</div>
+<div class="card" style="padding:24px;margin-top:16px">
+  <b>近 12 个月活跃（作品 · 闯关 · 接单）</b>
+  <div class="month-chart" id="months"></div>
+</div>
+
+<h2 class="section-title">年度使用关键回顾</h2>
+<div class="grid cols-4" id="review"></div>
+
+<h2 class="section-title" id="resume-title">工作简历</h2>
+<div class="card" style="padding:24px">
+  <div class="grid cols-3">
+    <div class="field" style="grid-column:1/-1"><label>个人简介</label>
+      <textarea id="r-bio" rows="2" placeholder="一句话介绍你的方向与经历"></textarea></div>
+    <div class="field"><label>技能标签（逗号分隔）</label>
+      <input id="r-skills" placeholder="国潮, 扁平商业, 插画"></div>
+    <div class="field" style="grid-column:2/4"><label>项目/接单经历</label>
+      <textarea id="r-exp" rows="2" placeholder="如：接单青藤文创帆布袋（好评结算）"></textarea></div>
+  </div>
+  <button class="btn" onclick="saveResume()">保存简历（投递实习随档案发送）</button>
+</div>
+
+<h2 class="section-title" id="msgbox">消息盒子 <span class="chip" id="msg-unread" style="font-size:12px;background:rgba(255,107,139,.16);color:var(--danger)"></span>
+  <button class="btn btn-ghost btn-sm" style="margin-left:10px" onclick="readAllMsg()">全部已读</button></h2>
+<div class="card" style="padding:20px" id="msg-list"></div>
+
+<h2 class="section-title" id="works">我的作品</h2>
+<div class="grid cols-4" id="works-list"></div>
+
+<h2 class="section-title" id="orders">我的订单</h2>
+<div class="grid cols-3" id="orders-box"></div>
+
+<h2 class="section-title" id="social">我的互动</h2>
+<div class="stat-ring" id="social-stats"></div>
+
+<h2 class="section-title" id="cert">证书管理</h2>
+<div class="grid cols-3" id="cert-list"></div>
+
+<h2 class="section-title" id="trace">帧集印迹</h2>
+<div class="card" style="padding:20px" id="trace-box"></div>
+{% endblock %}
+{% block me_scripts %}
+<script src="/static/js/dial.js"></script>
+<script>
+new FrameDial(document.getElementById('me-dial'), {
+  sectors: [
+    {label: '学习印迹', icon: '🌱', action: () => document.getElementById('trace').scrollIntoView({behavior:'smooth'})},
+    {label: '我的作品', icon: '🎨', action: () => location.href = '/create/shelf'},
+    {label: '消息盒子', icon: '✉️', action: () => document.getElementById('msgbox').scrollIntoView({behavior:'smooth'})},
+    {label: '证书管理', icon: '🏅', action: () => document.getElementById('cert').scrollIntoView({behavior:'smooth'})},
+    {label: '资产明细', icon: '💰', action: () => location.href = '/me/recharge'},
+    {label: '收藏对标', icon: '📚', action: () => location.href = '/me/favorites'},
+  ],
+  center: {label: '我的', action: () => window.scrollTo({top: 0, behavior: 'smooth'})},
+});
+
+async function loadMessages() {
+  const el = document.getElementById('msg-list');
+  const me = await API.ensureLogin();
+  if (!me) { el.innerHTML = '<p class="muted">登录后查看邀约与通知。</p>'; return; }
+  const res = await API.get('/api/market/messages');
+  if (res.code !== 0) return;
+  const KIND_ICON = {invite: '📩', review: '📝', order: '💼', coop: '🤝'};
+  document.getElementById('msg-unread').textContent =
+    res.data.unread ? `${res.data.unread} 条未读` : '全部已读';
+  el.innerHTML = res.data.items.map(m => `
+    <div class="msg-item ${m.is_read ? '' : 'unread'}" onclick="readMsg(${m.id}, '${m.link || ''}')">
+      <span style="font-size:18px">${KIND_ICON[m.kind] || '🔔'}</span>
+      <div style="flex:1">
+        <b style="font-size:13.5px">${API.esc(m.title)}</b>
+        <p class="muted" style="margin-top:3px;font-size:12.5px">${API.esc(m.content || '')}</p>
+      </div>
+      <span class="muted" style="font-size:11.5px;flex:none">${m.created_at}</span>
+    </div>`).join('') || '<p class="muted">暂无消息 · 有邀约或需求通知会第一时间出现在这里</p>';
+}
+
+async function readMsg(id, link) {
+  await API.post(`/api/market/messages/${id}/read`);
+  if (link) location.href = link;
+  else loadMessages();
+}
+
+async function readAllMsg() {
+  const me = await API.ensureLogin();
+  if (!me) return;
+  const res = await API.post('/api/market/messages/read-all');
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.toast(res.msg);
+  loadMessages();
+}
+
+async function loadCerts() {
+  const el = document.getElementById('cert-list');
+  const me = await API.ensureLogin();
+  if (!me) { el.innerHTML = '<div class="empty" style="grid-column:1/-1">登录后查看你的证书。</div>'; return; }
+  const res = await API.get('/api/market/me/certificates');
+  if (res.code !== 0) return;
+  el.innerHTML = res.data.map(c => `
+    <div class="cert-card">
+      <div class="cert-badge">${c.kind === 'offer' ? '🎁' : '🏅'}</div>
+      <b>${API.esc(c.title)}</b>
+      <p class="muted">颁发：${API.esc(c.issuer)} · ${c.at}</p>
+      <button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="downloadCert(this)">下载证书图片</button>
+    </div>`).join('') || '<div class="empty" style="grid-column:1/-1">通关阶段或收到实习邀约后，证书会出现在这里</div>';
+}
+
+async function downloadCert(btn) {
+  const card = btn.closest('.cert-card');
+  const badge = card.querySelector('.cert-badge').textContent;
+  const title = card.querySelector('b').textContent;
+  const meta = card.querySelector('.muted').textContent;
+  const w = 900, h = 600, r = 26;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+    <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#EAF7ED"/><stop offset=".55" stop-color="#E2ECF5"/><stop offset="1" stop-color="#F2D2FF"/>
+    </linearGradient></defs>
+    <rect width="${w}" height="${h}" rx="${r}" fill="url(#bg)"/>
+    <text x="60" y="120" font-size="30" fill="#274a56" font-weight="700">帧 集 · FrameLab</text>
+    <text x="60" y="180" font-size="18" fill="#41606b">CERTIFICATE</text>
+    <text x="${w / 2}" y="300" font-size="42" text-anchor="middle" fill="#6A4DD4" font-weight="800">${badge}</text>
+    <text x="${w / 2}" y="420" font-size="20" text-anchor="middle" fill="#23306b" font-weight="700">${title}</text>
+    <text x="${w / 2}" y="470" font-size="15" text-anchor="middle" fill="#555c78">${meta}</text>
+    <text x="60" y="${h - 50}" font-size="13" fill="#98a0b8">${new Date().toLocaleDateString('zh-CN')} 生成</text>
+  </svg>`;
+  const blob = new Blob([svg], {type: 'image/svg+xml'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'FrameLab证书.svg';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function loadAnalysis() {
+  const me = await API.ensureLogin();
+  if (!me) {
+    document.getElementById('stats').innerHTML =
+      '<div class="empty" style="grid-column:1/-1">登录后查看你的使用分析与年度回顾。</div>';
+    return;
+  }
+  const res = await API.get('/api/market/me/analysis');
+  if (res.code !== 0) return;
+  const c = res.data.counts;
+  document.getElementById('stats').innerHTML = `
+    <div class="cell"><b>${c.artworks}</b><span>云端作品</span></div>
+    <div class="cell"><b>${c.passed}</b><span>闯关通关</span></div>
+    <div class="cell"><b>${c.settled}</b><span>商单结算</span></div>
+    <div class="cell"><b>¥${c.income}</b><span>累计成交额</span></div>`;
+  const pct = (v, base) => Math.min(100, Math.round(v / base * 100));
+  document.getElementById('arcs').innerHTML = `
+    <div class="arc" style="--p:${pct(c.artworks, 10)};--ac:#6A4DD4"><i><b>${c.artworks}</b>作品</i></div>
+    <div class="arc" style="--p:${pct(c.passed, 16)};--ac:#7B75C9"><i><b>${c.passed}</b>通关</i></div>
+    <div class="arc" style="--p:${pct(c.likes_received, 10)};--ac:#d6336c"><i><b>${c.likes_received}</b>获赞</i></div>
+    <div class="arc" style="--p:${pct(c.exposure, 500)};--ac:#75CBD1"><i><b>${c.exposure}</b>曝光</i></div>`;
+  const mx = Math.max(...Object.values(res.data.monthly), 1);
+  document.getElementById('months').innerHTML = Object.entries(res.data.monthly)
+    .map(([k, v]) => `<div class="m" title="${k}：${v} 次"><i style="height:${Math.max(v / mx * 100, 3)}%"></i>${k.slice(5)}</div>`).join('');
+  const r = res.data.review;
+  document.getElementById('review').innerHTML = `
+    <div class="cell" style="text-align:left"><b style="font-size:15px;color:var(--c-client-5)">🌱 首件作品</b><p class="muted" style="margin-top:6px">${r.first_work || '还未上传，创作端等你开工'}</p></div>
+    <div class="cell" style="text-align:left"><b style="font-size:15px;color:var(--c-client-5)">🏆 最高通关分</b><p class="muted" style="margin-top:6px">${r.best_score || '—'}</p></div>
+    <div class="cell" style="text-align:left"><b style="font-size:15px;color:var(--c-client-5)">🎨 最常用风格</b><p class="muted" style="margin-top:6px">${API.esc(r.top_style || '—')}</p></div>
+    <div class="cell" style="text-align:left"><b style="font-size:15px;color:var(--c-client-5)">💰 结算收入</b><p class="muted" style="margin-top:6px">¥${r.settled_income}</p></div>`;
+}
+
+async function loadResume() {
+  const me = await API.ensureLogin();
+  if (!me) return;
+  const res = await API.get('/api/market/resume');
+  if (res.code !== 0) return;
+  const r = res.data.resume || {};
+  document.getElementById('r-bio').value = r.bio || '';
+  document.getElementById('r-skills').value = (r.skills || []).join(', ');
+  document.getElementById('r-exp').value = r.experience || '';
+}
+
+async function saveResume() {
+  const me = await API.ensureLogin();
+  if (!me) return location.href = '/login';
+  const res = await API.post('/api/market/resume', {
+    bio: document.getElementById('r-bio').value,
+    skills: document.getElementById('r-skills').value.split(/[,，]/).map(s => s.trim()).filter(Boolean),
+    experience: document.getElementById('r-exp').value,
+  });
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.toast(res.msg);
+}
+
+async function loadTrace() {
+  const box = document.getElementById('trace-box');
+  const me = await API.ensureLogin();
+  if (!me) { box.innerHTML = '<p class="muted">登录后你的每一次创作、闯关、接单都会留在这里。</p>'; return; }
+  const res = await API.get('/api/market/trace');
+  if (res.code !== 0) return;
+  box.innerHTML = res.data.map(t => `
+    <div class="trace-item"><span class="ic">${t.icon}</span>
+      <span style="flex:1">${API.esc(t.text)}</span>
+      <span class="when">${t.at}</span></div>`).join('')
+    || '<p class="muted">还没有印迹，去创作第一件作品吧</p>';
+}
+
+loadAnalysis(); loadResume(); loadTrace(); loadMessages(); loadCerts();
+loadWorks(); loadOrders(); loadSocial();
+
+async function loadWorks() {
+  const el = document.getElementById('works-list');
+  const me = await API.ensureLogin();
+  if (!me) { el.innerHTML = '<div class="empty" style="grid-column:1/-1">登录后查看你的作品。</div>'; return; }
+  const res = await API.get('/api/create/artworks');
+  if (res.code !== 0) return;
+  el.innerHTML = res.data.items.slice(0, 8).map(a => `
+    <div class="card" onclick="location.href='/create/artwork/${a.id}'">
+      <div class="cover" style="background:${API.coverCss(a.cover)}"></div>
+      <div class="body"><h4>${API.esc(a.title)}</h4>
+        <p class="muted">${API.esc(a.style || '')} · ${a.created_at || ''}</p></div>
+    </div>`).join('') || '<div class="empty" style="grid-column:1/-1">还没有作品，去创作端创作第一件吧</div>';
+}
+
+async function loadOrders() {
+  const el = document.getElementById('orders-box');
+  const me = await API.ensureLogin();
+  if (!me) { el.innerHTML = '<div class="empty" style="grid-column:1/-1">登录后查看你的订单。</div>'; return; }
+  const res = await API.get('/api/market/my-orders?role=taker');
+  if (res.code !== 0) return;
+  const items = res.data.items || [];
+  const ONGOING = ['accepted', 'delivered', 'reviewed'];
+  const groups = [
+    {name: '进行中', rows: items.filter(o => ONGOING.includes(o.status))},
+    {name: '已完成', rows: items.filter(o => o.status === 'settled')},
+    {name: '已取消', rows: items.filter(o => o.status === 'cancelled')},
+  ];
+  el.innerHTML = groups.map(g => `
+    <div class="card" style="padding:18px">
+      <b>${g.name} <span class="chip" style="font-size:11px">${g.rows.length}</span></b>
+      <div style="margin-top:10px">${g.rows.map(o => `
+        <div class="trace-item"><span class="ic">💼</span>
+          <span style="flex:1">${API.esc(o.title)} · ¥${o.budget}</span>
+          <span class="when">${o.status}</span></div>`).join('')
+        || '<p class="muted">暂无</p>'}</div>
+    </div>`).join('');
+}
+
+async function loadSocial() {
+  const el = document.getElementById('social-stats');
+  const me = await API.ensureLogin();
+  if (!me) { el.innerHTML = '<div class="empty" style="grid-column:1/-1">登录后查看互动数据。</div>'; return; }
+  const res = await API.get(`/api/social/users/${me.id}/stats`);
+  if (res.code !== 0) return;
+  const s = res.data;
+  el.innerHTML = `
+    <div class="cell"><b>${s.likes_received}</b><span>获赞</span></div>
+    <div class="cell"><b>${s.fans}</b><span>粉丝</span></div>
+    <div class="cell"><b>${s.following}</b><span>关注</span></div>`;
+}
+</script>
+{% endblock %}

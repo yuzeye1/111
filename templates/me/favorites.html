@@ -1,0 +1,85 @@
+{% extends 'me/base.html' %}
+{% set me_nav = 'favorites' %}
+{% block me_content %}
+<h2 style="color:var(--c-client-5)">收藏作品 / 赞</h2>
+<div class="tab-bar">
+  <span class="tab on" id="tab-fav" onclick="switchTab('fav')">★ 收藏（对标素材）</span>
+  <span class="tab" id="tab-like" onclick="switchTab('like')">♥ 赞过（作品）</span>
+</div>
+
+<div id="view-fav">
+  <div class="grid cols-4" id="fav-grid"></div>
+  <div id="fav-detail" style="display:none;margin-top:18px">
+    <div class="card" style="padding:22px;display:flex;gap:22px" id="fav-detail-body"></div>
+  </div>
+</div>
+
+<div id="view-like" style="display:none">
+  <div class="grid cols-4" id="like-grid"></div>
+</div>
+{% endblock %}
+{% block me_scripts %}
+<script>
+function switchTab(t) {
+  document.getElementById('view-fav').style.display = t === 'fav' ? '' : 'none';
+  document.getElementById('view-like').style.display = t === 'like' ? '' : 'none';
+  document.getElementById('tab-fav').classList.toggle('on', t === 'fav');
+  document.getElementById('tab-like').classList.toggle('on', t === 'like');
+}
+
+async function loadFavs() {
+  const res = await API.get('/edu/api/favorites');
+  if (res.code !== 0) {
+    document.getElementById('fav-grid').innerHTML = '<div class="empty">登录后可收藏对标素材</div>';
+    return;
+  }
+  document.getElementById('fav-grid').innerHTML = res.data.map(f => `
+    <div class="card" onclick="openFavDetail(${f.material_id})">
+      <div class="cover" style="background:${API.coverCss(f.material.cover)}"></div>
+      <div class="body"><h4>${API.esc(f.material.title)}</h4>
+        <div class="meta">${API.esc(f.folder)} · ${API.esc(f.material.style)}</div>
+        <button class="btn btn-ghost btn-sm" style="margin-top:8px"
+          onclick="event.stopPropagation();unfav(${f.material_id})">移出收藏</button>
+      </div>
+    </div>`).join('') || '<div class="empty">还没有收藏，去帧集优集书架选取素材</div>';
+}
+
+async function openFavDetail(mid) {
+  const m = (await API.get('/edu/api/materials/' + mid)).data;
+  const rows = Object.entries(m.analysis || {}).map(([k, v]) => `
+    <p style="margin:8px 0;line-height:1.8;font-size:13.5px"><b style="color:var(--acc-create)">${API.esc(k)}：</b>${API.esc(v)}</p>`).join('');
+  document.getElementById('fav-detail-body').innerHTML = `
+    <div class="cover" style="width:260px;height:260px;border-radius:14px;flex:none;background:${API.coverCss(m.cover)}"></div>
+    <div style="flex:1">
+      <h3>${API.esc(m.title)}</h3>
+      <p class="muted" style="margin:6px 0 10px">${API.esc(m.cat)} · ${API.esc(m.style)} · ${API.esc(m.artist || '')} ${API.esc(m.year || '')}</p>
+      ${rows}
+    </div>`;
+  document.getElementById('fav-detail').style.display = 'block';
+  document.getElementById('fav-detail').scrollIntoView({behavior: 'smooth'});
+}
+
+async function unfav(mid) {
+  const res = await API.post('/edu/api/favorites/remove', {material_id: mid});
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.toast(res.msg);
+  loadFavs();
+}
+
+async function loadLikes() {
+  const res = await API.get('/api/market/likes/mine');
+  if (res.code !== 0) {
+    document.getElementById('like-grid').innerHTML = '<div class="empty">登录后可查看赞过的作品</div>';
+    return;
+  }
+  document.getElementById('like-grid').innerHTML = res.data.map(l => `
+    <div class="card" onclick="location.href='/profile/${l.artwork.user_id}'">
+      <div class="cover" style="background:${API.coverCss(l.artwork.cover)}"></div>
+      <div class="body"><h4>${API.esc(l.artwork.title)}</h4>
+        <div class="meta">${API.esc(l.artwork.style_tag || '')} · 赞于 ${l.liked_at}</div></div>
+    </div>`).join('') || '<div class="empty">还没有赞过作品，去主站作品广场逛逛</div>';
+}
+
+loadFavs(); loadLikes();
+</script>
+{% endblock %}

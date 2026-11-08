@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block title %}个人主页 — 帧集 FrameLab{% endblock %}
+{% block main %}
+<div class="wrap">
+  <div class="page-head" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+    <div>
+      <h1 id="p-name">加载中…</h1>
+      <p id="p-meta"></p>
+    </div>
+    <button class="btn" id="p-follow" style="display:none" onclick="toggleFollow()">+ 关注</button>
+  </div>
+
+  <div class="grid cols-4" id="p-stats"></div>
+
+  <h2 class="section-title">作品集</h2>
+  <div class="grid cols-4" id="p-works"></div>
+
+  <h2 class="section-title">教学评价记录</h2>
+  <div class="card" style="padding:20px" id="p-evals"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function load() {
+  const uid = {{ uid }};
+  const res = await API.get('/api/market/profile/' + uid);
+  if (res.code !== 0) return API.toast(res.msg, false);
+  const p = res.data;
+  document.getElementById('p-name').textContent = p.user.name || '设计同学';
+  document.getElementById('p-meta').textContent =
+    `${p.user.school || ''} ${p.user.major || ''} ${p.user.grade || ''} · ${levelBadge(p.level)}`;
+  const social = await API.get(`/api/social/users/${uid}/stats`);
+  const s = (social.code === 0) ? social.data : {likes_received: 0, fans: 0, following: 0, is_following: false};
+  window.__followState = s.is_following;
+  const me = await API.ensureLogin();
+  const followBtn = document.getElementById('p-follow');
+  if (me && me.id !== uid) {
+    followBtn.style.display = '';
+    followBtn.textContent = s.is_following ? '已关注' : '+ 关注';
+  }
+  document.getElementById('p-stats').innerHTML = [
+    ['通关等级', levelBadge(p.level), '#3E5BA3'],
+    ['美学均分', p.aesthetic_avg, '#6A4DD4'],
+    ['接单评价', p.review_avg, '#75CBD1'],
+    ['信用分', p.user.credit_score, '#2a9d8f'],
+    ['获赞', s.likes_received, '#d6336c'],
+    ['粉丝', s.fans, '#6A4DD4'],
+    ['关注', s.following, '#75CBD1'],
+  ].map(([k, v, c]) => `
+    <div class="card" style="padding:20px;text-align:center">
+      <div style="font-size:26px;font-weight:800;color:${c}">${v}</div>
+      <div class="muted">${k}</div>
+    </div>`).join('');
+  document.getElementById('p-works').innerHTML =
+    p.artworks.map(a => `
+      <div class="card">
+        <div class="cover" style="background:${API.coverCss(a.cover)}"></div>
+        <div class="body"><h4>${API.esc(a.title)}</h4>
+        <div class="meta">${API.esc(a.style_tag || '')} · ${a.created_at}</div></div>
+      </div>`).join('') || '<div class="empty">暂无公开作品</div>';
+  document.getElementById('p-evals').innerHTML =
+    p.teaching_evals.map(e => `<p style="margin:6px 0;font-size:13.5px">【${e.kind === 'stage' ? '阶段通关' : '课程通关'}】${API.esc(e.title)} — ${API.esc(e.detail)}（${e.created_at}）</p>`).join('')
+    || '<p class="muted">暂无教学评价</p>';
+}
+
+async function toggleFollow() {
+  const me = await API.ensureLogin();
+  if (!me) return location.href = '/login';
+  const res = await API.post(`/api/social/users/{{ uid }}/follow`);
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.toast(res.msg);
+  load();
+}
+load();
+</script>
+{% endblock %}

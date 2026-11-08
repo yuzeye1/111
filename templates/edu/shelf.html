@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% set platform = 'edu' %}
+{% block title %}帧集优集 · 书架 — 帧集 FrameLab{% endblock %}
+{% block main %}
+<div class="wrap">
+  <div class="page-head ph-edu">
+    <h1>帧集优集 · 书架式选取</h1>
+    <p>把全站素材摆上书架 · 点书脊选取 · 随时放回</p>
+    <div class="plat-switch">
+      <a class="chip chip-client" href="/edu/index">← 回教育端</a>
+    </div>
+  </div>
+
+  <div class="ws-search">
+    <input id="shelf-kw" placeholder="查找：输入标题或风格关键词…">
+    <span class="muted" id="shelf-count"></span>
+  </div>
+
+  <div class="shelf-layout">
+    <div class="shelf-board">
+      <b style="color:var(--text)">素材书架</b>
+      <div class="shelf-spines" id="spines"></div>
+      <div class="shelf-base"></div>
+      <p class="muted" style="margin-top:12px;text-align:center">书架式选取 · 点击书脊查看大图</p>
+    </div>
+    <div class="shelf-detail" id="detail">
+      <div class="preview" id="d-preview"></div>
+      <div id="d-body" style="margin-top:18px"></div>
+      <div class="shelf-actions" id="d-actions"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let items = [], favIds = new Set(), curId = null;
+
+async function loadShelf() {
+  const kw = document.getElementById('shelf-kw').value.trim();
+  const res = await API.get('/edu/api/materials?kw=' + encodeURIComponent(kw));
+  if (res.code !== 0) return;
+  items = res.data.items;
+  const fav = await API.get('/edu/api/favorites');
+  favIds = new Set(fav.code === 0 ? fav.data.map(f => f.material_id) : []);
+  document.getElementById('shelf-count').textContent = '书架上有 ' + items.length + ' 册';
+  document.getElementById('spines').innerHTML = items.map((m, i) => `
+    <div class="spine ${m.id === curId ? 'on' : ''}" title="${API.esc(m.title)}"
+      style="height:${110 + (i * 37) % 60}px;background:${API.coverCss(m.cover)}"
+      onclick="pick(${m.id})">${API.esc(m.title.slice(0, 6))}</div>`).join('');
+  if (items.length && !items.find(m => m.id === curId)) pick(items[0].id);
+}
+
+async function pick(id) {
+  curId = id;
+  document.querySelectorAll('.spine').forEach(s => s.classList.remove('on'));
+  const m = (await API.get('/edu/api/materials/' + id)).data;
+  document.getElementById('d-preview').style.background = API.coverCss(m.cover);
+  const rows = Object.entries(m.analysis || {}).map(([k, v]) => `
+    <p style="margin:8px 0;line-height:1.8;font-size:14px"><b style="color:var(--acc-edu)">${API.esc(k)}：</b>${API.esc(v)}</p>`).join('');
+  document.getElementById('d-body').innerHTML = `
+    <h3>${API.esc(m.title)}</h3>
+    <p class="muted" style="margin:6px 0 10px">${API.esc(m.cat)} · ${API.esc(m.style)} · ${API.esc(m.artist || '')} ${API.esc(m.year || '')} · 适用场景：${API.esc(m.scene || '')}</p>
+    ${rows}`;
+  const picked = favIds.has(id);
+  document.getElementById('d-actions').innerHTML = `
+    <button class="btn ${picked ? 'picked' : ''}" onclick="toggleFav(${id}, ${picked})">
+      ${picked ? '✓ 已选取 · 点击放回书架' : '选取 · 加入对标收藏'}</button>
+    <button class="btn btn-ghost" onclick="location.href='/edu/index'">去教育端做对标练习 →</button>`;
+  // 高亮当前书脊
+  loadShelfHighlight();
+}
+
+function loadShelfHighlight() {
+  const idx = items.findIndex(m => m.id === curId);
+  const spines = document.querySelectorAll('.spine');
+  spines.forEach((s, i) => s.classList.toggle('on', i === idx));
+}
+
+async function toggleFav(id, picked) {
+  const res = picked
+    ? await API.post('/edu/api/favorites/remove', {material_id: id})
+    : await API.post('/edu/api/favorites', {material_id: id});
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.toast(res.msg);
+  if (picked) favIds.delete(id); else favIds.add(id);
+  pick(id);
+}
+
+document.getElementById('shelf-kw').addEventListener('input', loadShelf);
+loadShelf();
+</script>
+{% endblock %}

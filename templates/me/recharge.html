@@ -1,0 +1,94 @@
+{% extends 'me/base.html' %}
+{% set me_nav = 'recharge' %}
+{% block me_content %}
+<h2 style="color:var(--c-client-5)">充值 / 升级 · 金币 Token</h2>
+<p class="muted" style="margin:8px 0 20px">Token 用于订阅升级与灵感加次；演示环境为模拟支付，直接入账。</p>
+
+<!-- 充值套餐 -->
+<div class="grid cols-3" id="packs"></div>
+<div id="pay-row" style="margin-top:18px"></div>
+
+<h2 class="section-title">升级系统 · 订阅</h2>
+<div class="grid cols-3" id="tiers"></div>
+
+<h2 class="section-title">充值记录</h2>
+<div class="card" style="padding:20px" id="records"></div>
+{% endblock %}
+{% block me_scripts %}
+<script>
+let wallet = null, picked = null;
+
+async function loadWallet() {
+  const res = await API.get('/api/market/wallet');
+  if (res.code !== 0) return;
+  wallet = res.data;
+  renderPacks(); renderTiers(); loadRecords();
+}
+
+function renderPacks() {
+  document.getElementById('packs').innerHTML = wallet.packages.map(p => `
+    <div class="pack ${picked === p.id ? 'on' : ''}" onclick="pick('${p.id}')">
+      ${p.bonus ? `<span class="bonus">赠 ${p.bonus} Token</span>` : ''}
+      <div class="t">${p.tokens}<small> Token</small></div>
+      <div class="price">¥ ${p.price}</div>
+      <p class="muted">${p.tokens} Token${p.bonus ? ' + 赠 ' + p.bonus : ''} · 1 Token ≈ 灵感加练 1 次</p>
+    </div>`).join('');
+  document.getElementById('pay-row').innerHTML = picked ? `
+    <button class="btn btn-coin" onclick="recharge()">确认支付（演示）· ¥ ${wallet.packages.find(p => p.id === picked).price}</button>
+    <span class="muted" style="margin-left:12px">支付后 Token 直接入账</span>` : '';
+}
+
+function pick(id) { picked = id; renderPacks(); }
+
+async function recharge() {
+  const res = await API.post('/api/market/recharge', {package: picked});
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.toast(res.msg);
+  picked = null;
+  loadWallet();
+  refreshMeCoin();
+}
+
+function renderTiers() {
+  const cfg = wallet.tier_config, prices = wallet.tier_token_price || {};
+  document.getElementById('tiers').innerHTML = [0, 1, 2].map(t => `
+    <div class="tier-card ${wallet.tier === t ? 'current' : ''}">
+      <h4>${cfg[t].name} ${wallet.tier === t ? '<span class="chip on" style="font-size:11px">当前</span>' : ''}</h4>
+      ${t === 0 ? '<p class="muted">注册即得</p>' : `<p style="color:var(--gold);font-weight:700">${prices[t]} Token / 月</p>`}
+      <ul><li>云端空间 ${cfg[t].storage_gb}GB</li>
+          <li>灵感方案每日 ${cfg[t].inspire_daily} 次</li>
+          <li>${t >= 1 ? '作品广场优先曝光' : '作品广场标准展示'}</li>
+          <li>${t === 2 ? '工作流案例置顶推荐' : '按曝光度推荐'}</li></ul>
+      ${t > wallet.tier && t > 0 ? `
+        <button class="btn" style="width:100%" onclick="upgrade(${t})">
+          用 ${prices[t]} Token 升级</button>` : ''}
+    </div>`).join('');
+}
+
+async function upgrade(t) {
+  const me = await API.ensureLogin();
+  if (!me) return location.href = '/login';
+  const res = await API.post('/api/market/upgrade', {tier: t});
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.toast(res.msg);
+  loadWallet();
+  refreshMeCoin();
+}
+
+async function loadRecords() {
+  const box = document.getElementById('records');
+  const me = await API.ensureLogin();
+  if (!me) { box.innerHTML = '<p class="muted">登录后查看充值与订阅记录。</p>'; return; }
+  const res = await API.get('/api/market/recharge/records');
+  if (res.code !== 0) return;
+  box.innerHTML = res.data.map(r => `
+    <div class="trace-item"><span class="ic">${r.kind === 'recharge' ? '🪙' : r.kind === 'upgrade' ? '🚀' : '💬'}</span>
+      <span style="flex:1">${API.esc(r.note || '')}</span>
+      <span style="font-weight:700;color:${r.tokens > 0 ? 'var(--gold)' : 'var(--danger)'}">${r.tokens > 0 ? '+' : ''}${r.tokens} Token</span>
+      <span class="when">${r.created_at}${r.amount ? ' · ¥' + r.amount : ''}</span></div>`).join('')
+    || '<p class="muted">还没有记录，选个套餐充点 Token 吧</p>';
+}
+
+loadWallet();
+</script>
+{% endblock %}

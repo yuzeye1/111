@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% block title %}注册 — 帧集 FrameLab{% endblock %}
+{% block main %}
+<div class="form-card">
+  <h2>创建账号</h2>
+  <p class="lead">注册即送 30 积分与 1GB 云空间 · 账号不区分身份，教育 / 创作 / 接单功能全部开放</p>
+  <div class="field">
+    <label>邮箱</label>
+    <input id="email" type="email" placeholder="you@example.com">
+  </div>
+  <div class="field">
+    <label>验证码</label>
+    <div class="code-row">
+      <input id="code" maxlength="6" placeholder="6 位验证码">
+      <button class="btn btn-ghost" id="send-btn" onclick="sendCode()">获取验证码</button>
+    </div>
+  </div>
+  <div class="field">
+    <label>密码</label>
+    <input id="password" type="password" placeholder="至少 6 位，含字母和数字">
+  </div>
+  <div class="field">
+    <label>昵称</label>
+    <input id="name" placeholder="你的昵称">
+  </div>
+  <div class="field">
+    <label>学校</label>
+    <input id="school" placeholder="学校名称">
+  </div>
+  <div class="field">
+    <label>专业</label>
+    <input id="major" placeholder="如 视觉传达 / 产品设计">
+  </div>
+  <div class="field">
+    <label>年级</label>
+    <input id="grade" placeholder="如 大二">
+  </div>
+  <button class="btn btn-block" onclick="doRegister()">注册并登录</button>
+  <div class="form-foot">
+    <a href="/login">已有账号，直接登录</a>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+function countdown() {
+  const btn = document.getElementById('send-btn');
+  let s = 60;
+  btn.disabled = true;
+  const t = setInterval(() => {
+    btn.textContent = s + ' 秒后重发';
+    if (--s < 0) { clearInterval(t); btn.disabled = false; btn.textContent = '获取验证码'; }
+  }, 1000);
+}
+
+async function sendCode() {
+  const email = document.getElementById('email').value.trim();
+  if (!EMAIL_RE.test(email)) return API.toast('邮箱格式不正确', false);
+  const res = await API.post('/api/auth/send-code', { email, type: 'register' });
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.toast(res.msg);
+  countdown();
+}
+
+async function doRegister() {
+  const body = {
+    email: document.getElementById('email').value.trim(),
+    code: document.getElementById('code').value.trim(),
+    password: document.getElementById('password').value,
+    name: document.getElementById('name').value.trim(),
+    school: document.getElementById('school').value.trim(),
+    major: document.getElementById('major').value.trim(),
+    grade: document.getElementById('grade').value.trim(),
+  };
+  if (!EMAIL_RE.test(body.email)) return API.toast('邮箱格式不正确', false);
+  if (!body.code) return API.toast('请输入邮箱验证码', false);
+  if (body.password.length < 6) return API.toast('密码至少 6 位', false);
+  if (!/[a-zA-Z]/.test(body.password) || !/[0-9]/.test(body.password))
+    return API.toast('密码需同时包含字母和数字', false);
+  const res = await API.post('/api/auth/register', body);
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.setToken(res.data.token);
+  API.toast('注册成功');
+  setTimeout(() => location.href = '/index', 500);
+}
+</script>
+{% endblock %}

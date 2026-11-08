@@ -1,0 +1,401 @@
+{% extends 'base.html' %}
+{% set platform = 'edu' %}
+{% block title %}教育端 — 帧集 FrameLab{% endblock %}
+{% block main %}
+<div class="wrap">
+  <!-- 顶部：转盘式标题 + 右侧四大功能切换标签 -->
+  <div class="page-head ph-edu" style="position:relative;overflow:hidden;display:flex;gap:26px;align-items:center;flex-wrap:wrap">
+    <div id="edu-dial" style="flex:none;width:min(320px,72vw);height:min(320px,72vw)"></div>
+    <div style="flex:1;min-width:260px">
+      <h1>教育端平台 · 美学赏析 + 闯关实训</h1>
+      <p>赏析库建立审美坐标系 → 四阶段闯关把审美落到手上 → 双轨评分雷达看见成长</p>
+      <div class="plat-switch" style="margin-top:12px">
+        <a class="chip chip-client" href="/index">← 回主控</a>
+        <a class="chip chip-edu" href="/edu/shelf">帧集优集 · 书架</a>
+      </div>
+    </div>
+    <div class="edu-tabs" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;min-width:230px">
+      <button class="chip chip-edu on" data-panel="coop">教育合作</button>
+      <button class="chip chip-edu" data-panel="stage">学习闯关</button>
+      <button class="chip chip-create" data-panel="cert">资格认证</button>
+      <button class="chip chip-create" data-panel="workflow">上传工作流</button>
+    </div>
+  </div>
+
+  <!-- 顶部标签切换的功能面板 -->
+  <div class="card" style="padding:22px;margin-top:18px">
+    <div class="edu-panel on" id="panel-coop">
+      <b style="color:var(--acc-edu)">教育合作 · 院校 / 机构 / 大厂青苗</b>
+      <div class="grid cols-3" id="coop-grid" style="margin-top:14px"></div>
+      <a class="btn btn-ghost btn-sm" style="margin-top:14px" href="/edu/cooperation">查看合作细则与申报入口 →</a>
+    </div>
+    <div class="edu-panel" id="panel-stage">
+      <b style="color:var(--acc-edu)">学习闯关 · 四阶段进度速览</b>
+      <div id="stage-summary" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+        <a class="btn btn-sm" href="/edu/course">进入视频闯关学习页 →</a>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('stages').scrollIntoView({behavior:'smooth'})">查看闯关进度 ↓</button>
+      </div>
+    </div>
+    <div class="edu-panel" id="panel-cert">
+      <b style="color:var(--acc-create)">资格证书认证</b>
+      <p class="muted" style="margin-top:10px;line-height:1.9">
+        平台按闯关进度与评测成绩发放初级 / 中级 / 高级资格证书，证书可在个人中心下载图片，
+        并在派单大厅作为甲方选定的能力凭证。</p>
+      <a class="btn btn-sm" style="margin-top:14px" href="/me#cert">前往资格认证 →</a>
+    </div>
+    <div class="edu-panel" id="panel-workflow">
+      <b style="color:var(--acc-create)">上传工作流 · 反哺社区教学</b>
+      <div class="grid cols-2" style="margin-top:14px">
+        <div class="field"><label>模板名称</label><input id="wf-name" placeholder="如：国潮海报六步法"></div>
+        <div class="field"><label>提示词 / 流程描述</label><input id="wf-prompt" placeholder="核心提示词或步骤摘要"></div>
+      </div>
+      <button class="btn" style="margin-top:6px" onclick="saveWorkflowTpl()">保存工作流模板</button>
+      <p class="muted" style="margin-top:10px">曝光度达 500 后，你的工作流可发布到案例广场供全站学习。</p>
+    </div>
+  </div>
+
+  <!-- 深色弥散：软件工具选择通栏（图标跳转对应软件配套教学课程） -->
+  <div class="dark-diffuse" style="margin-top:22px">
+    <b>多软件工具选择 · 点击图标跳转对应软件配套教学课程</b>
+    <div class="tool-icons" id="tool-icons"></div>
+  </div>
+
+  <h2 class="section-title">每日推送</h2>
+  <div class="push-grid">
+    <div class="push-card"><b>教育精进</b><p id="daily-edu">加载中…</p></div>
+    <div class="push-card"><b>商业风格参考</b><p id="daily-client">加载中…</p></div>
+  </div>
+
+  <!-- 闯关进度展示模块 -->
+  <h2 class="section-title" id="stages">闯关进度 · 四阶段实训</h2>
+  <div style="margin-bottom:12px">
+    <a class="btn btn-sm" href="/edu/course">进入视频闯关学习页 →</a>
+  </div>
+  <div id="stage-list"></div>
+
+  <!-- 评测实训功能模块 -->
+  <h2 class="section-title">评测实训 · 成长雷达（六维均分）</h2>
+  <div class="grid cols-2">
+    <div class="card" style="padding:24px" id="growth-box">登录后查看你的六维成长雷达与教学评价记录。</div>
+    <div class="card" style="padding:24px">
+      <b style="color:var(--text)">教学评价记录</b>
+      <div id="eval-list" style="margin-top:12px"><p class="muted">登录后查看</p></div>
+      <a class="btn btn-sm" style="margin-top:16px" href="/edu/course">进入作业提交与评测页 →</a>
+    </div>
+  </div>
+
+  <!-- 多渠道课程选择区域：横向滑动切换渠道教学内容 -->
+  <h2 class="section-title">多渠道课程资源 · 横向滑动浏览</h2>
+  <div class="card" style="padding:22px">
+    <div id="channel-tabs" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"></div>
+    <div class="course-rail" id="channel-courses"></div>
+  </div>
+
+  <h2 class="section-title">美学赏析库</h2>
+  <div id="mat-filters" style="margin-bottom:14px"></div>
+  <div class="grid cols-4" id="mat-grid"></div>
+
+  <h2 class="section-title">我的对标收藏</h2>
+  <div class="grid cols-4" id="fav-grid"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/dial.js"></script>
+<script>
+const CATS = ['全部', '经典艺术', '现代商业', '小众创意', '美学理论'];
+const CHANNELS = ['全部', 'B站', '小红书', 'MOOC教材', '商业拆分', '平台上传'];
+let curCat = '全部', curKw = '', curChannel = '全部';
+
+/* ---------- 顶部转盘：拖拽阻尼旋转，分区跳转 ---------- */
+new FrameDial(document.getElementById('edu-dial'), {
+  sectors: [
+    {label: '赏析库', icon: '📚', action: () => document.getElementById('mat-filters').scrollIntoView({behavior:'smooth'})},
+    {label: '学习闯关', icon: '🎯', action: () => document.getElementById('stages').scrollIntoView({behavior:'smooth'})},
+    {label: '课程资源', icon: '🎬', action: () => document.getElementById('channel-tabs').scrollIntoView({behavior:'smooth'})},
+    {label: '成长雷达', icon: '📈', action: () => document.getElementById('growth-box').scrollIntoView({behavior:'smooth'})},
+  ],
+  center: {label: '帧集', action: () => window.scrollTo({top: 0, behavior: 'smooth'})},
+});
+
+/* ---------- 顶部功能标签：切换面板 ---------- */
+document.querySelectorAll('.edu-tabs .chip').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.edu-tabs .chip').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    document.querySelectorAll('.edu-panel').forEach(p => p.classList.remove('on'));
+    document.getElementById('panel-' + btn.dataset.panel).classList.add('on');
+    if (btn.dataset.panel === 'coop') loadPartners();
+    if (btn.dataset.panel === 'stage') loadStageSummary();
+  });
+});
+
+async function loadPartners() {
+  const box = document.getElementById('coop-grid');
+  if (box.dataset.loaded) return;
+  const res = await API.get('/edu/api/partners');
+  if (res.code !== 0) return;
+  box.dataset.loaded = '1';
+  box.innerHTML = Object.entries(res.data).map(([kind, items]) => `
+    <div style="padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--bg-soft)">
+      <b style="color:var(--acc-edu)">${API.esc(kind)}（${items.length}）</b>
+      <p class="muted" style="margin-top:8px;line-height:1.8">
+        ${items.map(p => API.esc(p.name)).join(' / ') || '暂无'}</p>
+    </div>`).join('') || '<div class="empty">暂无合作项目</div>';
+}
+
+async function loadStageSummary() {
+  const res = await API.get('/edu/api/stages');
+  if (res.code !== 0) return;
+  document.getElementById('stage-summary').innerHTML = res.data.map(s => `
+    <span class="chip ${s.state === 'done' ? 'chip-edu' : s.state === 'now' ? 'chip-create' : ''}"
+      style="padding:8px 16px">
+      ${API.esc(s.stage.code)} ${API.esc(s.stage.name)} · 通关 ${s.passed}/${s.course_total}
+      ${s.state === 'done' ? '✓' : s.state === 'now' ? '进行中' : '锁定'}</span>`).join('');
+}
+
+async function saveWorkflowTpl() {
+  const name = document.getElementById('wf-name').value.trim();
+  const prompt = document.getElementById('wf-prompt').value.trim();
+  if (!name || !prompt) return API.toast('请填写模板名称与提示词', false);
+  const res = await API.post('/create/api/workflows', {name, prompt});
+  API.toast(res.msg, res.code === 0);
+  if (res.code === 0) {
+    document.getElementById('wf-name').value = '';
+    document.getElementById('wf-prompt').value = '';
+  }
+}
+
+/* ---------- 软件工具通栏：跳转配套教学课程（外链），附官方下载 ---------- */
+const SOFTWARES = [
+  {name: 'Ps', full: 'Photoshop', grad: 'linear-gradient(140deg,#31A8FF,#001E36)',
+   course: 'https://helpx.adobe.com/cn/photoshop/tutorials.html', official: 'https://www.adobe.com/cn/products/photoshop.html'},
+  {name: 'Ai', full: 'Illustrator', grad: 'linear-gradient(140deg,#FF9A00,#330000)',
+   course: 'https://helpx.adobe.com/cn/illustrator/tutorials.html', official: 'https://www.adobe.com/cn/products/illustrator.html'},
+  {name: 'Dw', full: 'Dreamweaver', grad: 'linear-gradient(140deg,#FF61F6,#302B57)',
+   course: 'https://helpx.adobe.com/cn/dreamweaver/tutorials.html', official: 'https://www.adobe.com/cn/products/dreamweaver.html'},
+  {name: '画世界', full: '移动端绘画', grad: 'linear-gradient(140deg,#7B75C9,#EAF7ED)',
+   course: 'https://search.bilibili.com/all?keyword=%E7%94%BB%E4%B8%96%E7%95%8C%E6%95%99%E7%A8%8B', official: 'https://www.huashijie.art/'},
+  {name: '可画', full: 'Canva 在线设计', grad: 'linear-gradient(140deg,#00C4CC,#7D2AE8)',
+   course: 'https://www.canva.cn/learn/', official: 'https://www.canva.cn/'},
+  {name: '醒图', full: '修图调色', grad: 'linear-gradient(140deg,#FF5C8A,#FFB86C)',
+   course: 'https://search.bilibili.com/all?keyword=%E9%86%92%E5%9B%BE%E6%95%99%E7%A8%8B', official: 'https://www.retouchpics.com/'},
+];
+document.getElementById('tool-icons').innerHTML = SOFTWARES.map(s => `
+  <div style="display:flex;flex-direction:column;align-items:center;gap:5px">
+    <a class="tool-icon" href="${s.course}" target="_blank" rel="noopener" title="${s.full} 配套教学课程">
+      <span style="background:${s.grad}">${s.name}</span>${s.full}
+      <small>配套教学课程 ↗</small>
+    </a>
+    <a href="${s.official}" target="_blank" rel="noopener"
+       style="font-size:11px;color:#8fe3c0;text-decoration:none;opacity:.85">官方下载</a>
+  </div>`).join('');
+
+/* ---------- 每日推送 ---------- */
+async function loadDaily() {
+  const res = await API.get('/edu/api/daily');
+  if (res.code !== 0) return;
+  document.getElementById('daily-edu').textContent = res.data.edu_push || '登录后按薄弱维度定制';
+  document.getElementById('daily-client').textContent = res.data.client_push || '';
+}
+
+/* ---------- 闯关进度 ---------- */
+async function loadStages() {
+  const res = await API.get('/edu/api/stages');
+  if (res.code !== 0) return;
+  document.getElementById('stage-list').innerHTML = res.data.map(s => `
+    <div class="stage ${s.state}" onclick="openStage(${s.stage.id}, '${s.state}')">
+      <div class="code">${API.esc(s.stage.code)}</div>
+      <div class="info">
+        <b>${API.esc(s.stage.name)}</b>
+        <p>${API.esc(s.stage.desc || '')}</p>
+        <p class="muted">通关 ${s.passed}/${s.course_total} · ${s.state === 'done' ? '已通关' : s.state === 'now' ? '进行中' : '锁定（先通关上一阶段）'}</p>
+      </div>
+      ${s.state !== 'lock' ? '<button class="btn btn-sm">视频闯关 →</button>' : ''}
+    </div>`).join('');
+}
+
+async function openStage(sid, state) {
+  if (state === 'lock') return;
+  const res = await API.get(`/edu/api/stages/${sid}/courses`);
+  if (res.code !== 0) return API.toast(res.msg, false);
+  const d = res.data;
+  const html = d.courses.map(c => {
+    const p = c.progress;
+    return `<div class="card" style="margin-bottom:12px;padding:18px 20px;cursor:pointer"
+      onclick="location.href='/edu/course/${c.course.id}'">
+      <b>${API.esc(c.course.name)}</b>
+      <p class="muted" style="margin-top:6px">${API.esc(c.course.brief || '')}</p>
+      ${p ? `<p style="margin-top:8px;font-size:13px">得分 <b>${p.score}</b> · ${p.status === 'passed' ? '✓ 已通关' : '待重练（薄弱：' + (p.weak || []).join('、') + '）'}</p>` : '<p class="muted" style="margin-top:8px">未开始 · 点击进入视频闯关学习页</p>'}
+      <span style="display:inline-block;margin-top:8px;color:var(--acc-create);font-size:13px;font-weight:600">进入教学端详情 →</span>
+    </div>`;
+  }).join('');
+  document.getElementById('stage-list').innerHTML =
+    `<button class="btn btn-ghost btn-sm" onclick="loadStages()" style="margin-bottom:14px">← 返回阶段列表</button>
+     <h3 style="margin-bottom:12px">${API.esc(d.stage.code)} ${API.esc(d.stage.name)}</h3>` + html;
+}
+
+/* ---------- 多渠道课程资源：外部渠道为外链，平台上传为站内课 ---------- */
+const EXT_COURSES = {
+  'B站': [
+    {t: 'PS 零基础入门实战', d: 'bilibili · 图像处理系统入门系列', s: 'bili-ps',
+     u: 'https://search.bilibili.com/all?keyword=PS%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%85%A5%E9%97%A8%E6%95%99%E7%A8%8B'},
+    {t: 'Illustrator 矢量插画入门', d: 'bilibili · 矢量绘制与标志实战', s: 'bili-ai',
+     u: 'https://search.bilibili.com/all?keyword=AI%E7%9F%A2%E9%87%8F%E6%8F%92%E7%94%BB%E6%95%99%E7%A8%8B'},
+    {t: '画世界 Pro 板绘上手', d: 'bilibili · 移动端板绘从零到接稿', s: 'bili-hsj',
+     u: 'https://search.bilibili.com/all?keyword=%E7%94%BB%E4%B8%96%E7%95%8C%E6%95%99%E7%A8%8B'},
+  ],
+  '小红书': [
+    {t: '醒图修图调色笔记', d: '小红书 · 人像精修参数与滤镜分享', s: 'xhs-xt',
+     u: 'https://www.xiaohongshu.com/search_result?keyword=%E9%86%92%E5%9B%BE%E6%95%99%E7%A8%8B'},
+    {t: '可画海报排版技巧', d: '小红书 · 模板拆解与版式速成', s: 'xhs-canva',
+     u: 'https://www.xiaohongshu.com/search_result?keyword=%E5%8F%AF%E7%94%BB%E6%B5%B7%E6%8A%A5'},
+    {t: '商业设计拆解笔记', d: '小红书 · 爆款商业案例逐层拆解', s: 'xhs-biz',
+     u: 'https://www.xiaohongshu.com/search_result?keyword=%E5%95%86%E4%B8%9A%E8%AE%BE%E8%AE%A1%E6%8B%86%E8%A7%A3'},
+  ],
+  'MOOC教材': [
+    {t: '中国大学MOOC · 设计思维', d: 'icourse163 · 设计思维与方法入门', s: 'mooc-design',
+     u: 'https://www.icourse163.org/search.htm?search=%E8%AE%BE%E8%AE%A1'},
+    {t: '中国大学MOOC · 色彩构成', d: 'icourse163 · 色彩体系与构成原理', s: 'mooc-color',
+     u: 'https://www.icourse163.org/search.htm?search=%E8%89%B2%E5%BD%A9'},
+    {t: '中国大学MOOC · 视觉传达', d: 'icourse163 · 视觉传达设计专业课', s: 'mooc-vc',
+     u: 'https://www.icourse163.org/search.htm?search=%E8%A7%86%E8%A7%89%E4%BC%A0%E8%BE%BE'},
+  ],
+  '商业拆分': [
+    {t: '站酷 · 商业项目拆解', d: 'zcool · 商业项目全流程复盘', s: 'zk-biz',
+     u: 'https://www.zcool.com.cn/search/content?word=%E5%95%86%E4%B8%9A%E6%8B%86%E8%A7%A3'},
+    {t: '站酷 · 海报设计拆解', d: 'zcool · 海报构图与配色逐层分析', s: 'zk-poster',
+     u: 'https://www.zcool.com.cn/search/content?word=%E6%B5%B7%E6%8A%A5%E6%8B%86%E8%A7%A3'},
+    {t: '优设 · 商业案例观察', d: 'uisdc · 全网商业设计案例前线', s: 'uisdc',
+     u: 'https://www.uisdc.com/'},
+  ],
+};
+
+function extCard(c, channel) {
+  return `<a class="card rail-card" style="padding:14px;text-decoration:none" href="${c.u}" target="_blank" rel="noopener">
+    <div class="r-cover" style="background-image:url('https://picsum.photos/seed/${c.s}/400/240')"></div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+      <span class="chip chip-edu" style="font-size:12px;padding:3px 10px">${API.esc(channel)}</span>
+      <span class="muted" style="font-size:12px">外部课程 ↗</span>
+    </div>
+    <b style="font-size:14px;color:var(--text)">${API.esc(c.t)}</b>
+    <p class="muted" style="margin-top:6px;line-height:1.6">${API.esc(c.d)}</p>
+  </a>`;
+}
+
+function innerCard(c) {
+  return `<div class="card rail-card" style="padding:14px;cursor:pointer" onclick="location.href='/edu/course/${c.id}'">
+    <div class="r-cover" style="background-image:url('https://picsum.photos/seed/fl-course-${c.id}/400/240')"></div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+      <span class="chip chip-create" style="font-size:12px;padding:3px 10px">${API.esc(c.channel || '平台上传')}</span>
+      <span class="muted" style="font-size:12px">${API.esc(c.stage)}</span>
+      ${c.passed ? '<span style="color:#2a9d8f;font-size:12px;font-weight:700">✓ 已通关</span>' : ''}
+    </div>
+    <b style="font-size:14px">${API.esc(c.name)}</b>
+    <p class="muted" style="margin-top:6px;line-height:1.6">${API.esc(c.brief || '')}</p>
+  </div>`;
+}
+
+async function loadChannel() {
+  const rail = document.getElementById('channel-courses');
+  let html = '';
+  if (curChannel === '全部' || curChannel === '平台上传') {
+    const res = await API.get('/edu/api/channel-courses?channel=' + encodeURIComponent(curChannel));
+    if (res.code === 0) html += res.data.map(innerCard).join('');
+  }
+  if (curChannel !== '平台上传') {
+    const chans = curChannel === '全部' ? Object.keys(EXT_COURSES) : [curChannel];
+    html += chans.map(ch => EXT_COURSES[ch].map(c => extCard(c, ch)).join('')).join('');
+  }
+  rail.innerHTML = html || '<div class="empty">该渠道暂无课程</div>';
+}
+function setChannel(ch) {
+  curChannel = ch;
+  document.querySelectorAll('#channel-tabs .chip').forEach(e => e.classList.remove('on'));
+  event.target.classList.add('on');
+  loadChannel();
+}
+document.getElementById('channel-tabs').innerHTML =
+  CHANNELS.map(c => `<span class="chip ${c === curChannel ? 'on' : ''}" onclick="setChannel('${c}')">${c}</span>`).join('');
+
+/* ---------- 成长雷达 + 教学评价 ---------- */
+async function loadGrowth() {
+  const box = document.getElementById('growth-box');
+  const res = await API.get('/edu/api/growth-map');
+  if (res.code !== 0) return;
+  const r = res.data.radar;
+  box.innerHTML = `
+    <div class="dims">
+      ${Object.entries(r).map(([k, v]) => `
+        <div class="dim">
+          <div class="bar"><i style="height:${Math.max(v, 4)}%"></i></div>
+          <b>${v}</b><br><span>${API.esc(k)}</span>
+        </div>`).join('')}
+    </div>
+    <p class="muted" style="margin-top:14px">已通关 ${res.data.passed} 课 · 提交 ${res.data.attempts} 次</p>`;
+  const ev = await API.get('/edu/api/teach-evals');
+  if (ev.code === 0) {
+    document.getElementById('eval-list').innerHTML = ev.data.map(e => `
+      <div style="padding:10px 0;border-bottom:1px dashed var(--border)">
+        <b style="font-size:13.5px;color:var(--acc-edu)">${API.esc(e.title)}</b>
+        <p class="muted" style="margin-top:4px;font-size:12.5px">${API.esc(e.detail || '')} · ${e.created_at}</p>
+      </div>`).join('') || '<p class="muted">暂无评价记录，先去闯一关吧</p>';
+  }
+}
+
+/* ---------- 美学赏析库 ---------- */
+async function loadMaterials() {
+  const q = new URLSearchParams({cat: curCat, kw: curKw});
+  const res = await API.get('/edu/api/materials?' + q);
+  if (res.code !== 0) return;
+  document.getElementById('mat-grid').innerHTML = res.data.items.map(m => `
+    <div class="card" onclick="location.href='/create/gallery'">
+      <div class="cover" style="background:${API.coverCss(m.cover)}"></div>
+      <div class="body">
+        <h4>${API.esc(m.title)}</h4>
+        <div class="meta">${API.esc(m.style)} · ${API.esc(m.artist || '')} ${API.esc(m.year || '')}</div>
+        <button class="btn btn-ghost btn-sm" style="margin-top:10px"
+          onclick="event.stopPropagation();favMaterial(${m.id})">收藏对标</button>
+      </div>
+    </div>`).join('') || '<div class="empty">暂无素材</div>';
+}
+
+async function favMaterial(id) {
+  const res = await API.post('/edu/api/favorites', {material_id: id});
+  API.toast(res.msg, res.code === 0);
+  loadFavorites();
+}
+
+async function loadFavorites() {
+  const res = await API.get('/edu/api/favorites');
+  if (res.code !== 0) {
+    document.getElementById('fav-grid').innerHTML = '<div class="empty">登录后可建立对标收藏夹</div>';
+    return;
+  }
+  const folders = {};
+  for (const f of res.data) (folders[f.folder] = folders[f.folder] || []).push(f);
+  document.getElementById('fav-grid').innerHTML = Object.entries(folders).map(([name, items]) => `
+    <div class="card" style="padding:16px;grid-column:1/-1">
+      <b style="color:var(--acc-edu)">收藏夹「${API.esc(name)}」(${items.length})</b>
+      <div class="grid cols-4" style="margin-top:12px">
+        ${items.map(f => `
+          <div class="card">
+            <div class="cover" style="background:${API.coverCss(f.material.cover)}"></div>
+            <div class="body"><h4>${API.esc(f.material.title)}</h4>
+            <div class="meta">${API.esc(f.material.style)}</div></div>
+          </div>`).join('')}
+      </div>
+    </div>`).join('') || '<div class="empty">还没有收藏，点上面的素材加入对标收藏</div>';
+}
+
+(function init() {
+  document.getElementById('mat-filters').innerHTML =
+    CATS.map(c => `<span class="chip ${c === curCat ? 'on' : ''}" onclick="setCat('${c}')">${c}</span>`).join('') +
+    `<input id="kw" placeholder="搜索标题…" oninput="curKw=this.value;loadMaterials()" style="padding:6px 12px;border-radius:999px;border:1.5px solid var(--border-strong);background:var(--bg-soft);color:var(--text);margin-left:10px">`;
+  loadPartners();
+  loadDaily(); loadMaterials(); loadStages(); loadGrowth(); loadFavorites(); loadChannel();
+})();
+
+function setCat(c) { curCat = c; document.querySelectorAll('#mat-filters .chip').forEach(e => e.classList.remove('on')); event.target.classList.add('on'); loadMaterials(); }
+</script>
+{% endblock %}

@@ -1,0 +1,285 @@
+{% extends 'base.html' %}
+{% set platform = 'edu' %}
+{% block title %}闯关课堂 — 帧集 FrameLab{% endblock %}
+{% block main %}
+<div class="wrap">
+  <div class="page-head ph-edu">
+    <h1 id="c-title">闯关课堂</h1>
+    <p id="c-sub">加载中…</p>
+    <div class="plat-switch">
+      <a class="chip chip-client" href="/edu/index#stages">← 回教育端</a>
+      <a class="chip chip-edu" href="/edu/shelf">帧集优集</a>
+    </div>
+  </div>
+
+  <div class="course-wrap">
+    <!-- 左侧：章节树形目录 -->
+    <aside class="card" style="padding:16px;position:sticky;top:84px;max-height:calc(100vh - 100px);overflow:auto">
+      <b style="color:var(--text)">章节目录</b>
+      <div id="tree" style="margin-top:10px"></div>
+    </aside>
+
+    <!-- 右侧：课程主体 -->
+    <div>
+      <div class="course-layout">
+        <div class="video-panel">
+          <div class="screen" id="screen">
+            <div class="caption" id="caption">点击 ▶ 开始本课讲解</div>
+          </div>
+          <div class="controls">
+            <button class="play" id="play" onclick="togglePlay()">▶</button>
+            <span id="play-pos">00:00 / --:--</span>
+            <span style="margin-left:auto" id="lesson-name"></span>
+          </div>
+        </div>
+        <div class="alloc-panel">
+          <b style="color:var(--text)">关卡分配</b>
+          <div id="alloc" style="margin-top:10px"></div>
+        </div>
+        <div class="notes-panel">
+          <b style="color:var(--text)">随堂笔记</b>
+          <textarea id="note" placeholder="边看边记，自动保存到你的账户…"></textarea>
+          <button class="btn btn-sm" style="margin-top:10px" onclick="saveNote()">保存笔记</button>
+          <p class="muted" id="note-time" style="margin-top:8px"></p>
+        </div>
+      </div>
+
+      <!-- 应用：画板 + 提交通关 -->
+      <div class="board-panel">
+        <b style="color:var(--text)">应用 · 实操画板</b>
+        <div class="board-tools">
+          <span class="muted">画笔：</span>
+          <div class="color on" style="background:#3E5BA3" onclick="setPen('#3E5BA3',this)"></div>
+          <div class="color" style="background:#d6336c" onclick="setPen('#d6336c',this)"></div>
+          <div class="color" style="background:#2a9d8f" onclick="setPen('#2a9d8f',this)"></div>
+          <div class="color" style="background:#6A4DD4" onclick="setPen('#6A4DD4',this)"></div>
+          <div class="color" style="background:#333" onclick="setPen('#333',this)"></div>
+          <input type="range" min="2" max="16" value="4" id="pen-size" style="width:100px"
+            oninput="penSize=this.value;this.style.setProperty('--v',((this.value-2)/14*100)+'%')">
+          <button class="btn btn-ghost btn-sm" onclick="clearBoard()">清空画板</button>
+          <span class="muted" style="margin-left:auto">在画板上起草，再提交作品通关</span>
+        </div>
+        <canvas id="board" class="board-canvas"></canvas>
+      </div>
+
+      <div class="card" style="padding:24px;margin-top:18px" id="submit-box"></div>
+
+      <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap">
+        <button class="btn btn-ghost" id="prev-btn" onclick="goSibling(-1)">← 上一关</button>
+        <button class="btn" id="next-btn" onclick="goSibling(1)">下一关 →</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const CID = {{ cid }};
+let courseData = null, playing = false, capIdx = 0, timer = null;
+let pen = '#3E5BA3', penSize = 4, drawing = false;
+
+/* ---------- 课程数据 ---------- */
+async function loadCourse() {
+  const res = await API.get('/edu/api/courses/' + CID);
+  if (res.code !== 0) { document.getElementById('c-title').textContent = res.msg; return; }
+  courseData = res.data;
+  const c = courseData.course;
+  document.getElementById('c-title').textContent = c.name;
+  document.getElementById('c-sub').textContent =
+    (courseData.stage ? courseData.stage.code + ' ' + courseData.stage.name + ' · ' : '') + (c.brief || '');
+  document.getElementById('lesson-name').textContent = c.name;
+  document.getElementById('alloc').innerHTML = courseData.allocation.map(a => `
+    <div class="item ${a.current ? 'current' : ''} ${a.status === 'passed' ? 'passed' : ''}"
+      onclick="location.href='/edu/course/${a.id}'">
+      <span class="num">${a.no}</span>
+      <span style="flex:1">${API.esc(a.name)}</span>
+      ${a.score ? `<span class="muted">${a.score}分</span>` : ''}
+      ${a.status === 'passed' ? '<span style="color:#2a9d8f">✓</span>' : ''}
+    </div>`).join('');
+  const idx = courseData.allocation.findIndex(a => a.current);
+  const prev = document.getElementById('prev-btn'), next = document.getElementById('next-btn');
+  prev.style.visibility = idx > 0 ? 'visible' : 'hidden';
+  next.style.visibility = idx >= 0 && idx < courseData.allocation.length - 1 ? 'visible' : 'hidden';
+  renderSubmitBox();
+  loadNote();
+  loadTree();
+}
+
+function goSibling(step) {
+  const idx = courseData.allocation.findIndex(a => a.current);
+  const target = courseData.allocation[idx + step];
+  if (target) location.href = '/edu/course/' + target.id;
+}
+
+/* ---------- 左侧章节树 ---------- */
+async function loadTree() {
+  const res = await API.get('/edu/api/course-tree');
+  if (res.code !== 0) return;
+  document.getElementById('tree').innerHTML = res.data.map(st => `
+    <div class="tree-stage ${st.state === 'lock' ? 'lock' : ''}">
+      <b>${API.esc(st.stage.code)} ${API.esc(st.stage.name)} ${st.passed}/${st.course_total}</b>
+      ${st.nodes.map(n => `
+        <div class="tree-node ${n.id === CID ? 'current' : ''} ${n.status === 'passed' ? 'passed' : ''}"
+          onclick="${st.state === 'lock' ? '' : `location.href='/edu/course/${n.id}'`}">
+          <span class="st"></span>
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${API.esc(n.name)}">${API.esc(n.name)}</span>
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+function renderSubmitBox() {
+  const p = courseData.progress;
+  const box = document.getElementById('submit-box');
+  if (courseData.locked) {
+    box.innerHTML = '<p class="muted">先通关上一阶段才能解锁本课。</p>';
+    return;
+  }
+  box.innerHTML = `
+    <h3 style="margin-bottom:10px">随堂任务提交 · 通关解锁下一关</h3>
+    ${p ? `<p style="font-size:13.5px;margin-bottom:10px">当前：得分 <b>${p.score}</b> · ${p.status === 'passed' ? '✓ 已通关' : '待重练（薄弱：' + (p.weak || []).join('、') + '）'} · 已尝试 ${p.attempts} 次</p>` : ''}
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <input id="work-title" placeholder="作品标题（如《春日招贴》）" style="flex:1;min-width:240px;padding:11px 14px;border-radius:10px;border:1.5px solid var(--border-strong);background:var(--bg-soft);color:var(--text)">
+      <button class="btn" onclick="submitWork()">提交作品 · AI 初评通关</button>
+      <button class="btn btn-ghost" onclick="saveBoardToPortfolio()">把画板存入作品集</button>
+    </div>
+    <div id="score-out"></div>`;
+}
+
+async function submitWork() {
+  const title = document.getElementById('work-title').value.trim();
+  if (!title) return API.toast('请填写作品标题', false);
+  const res = await API.post(`/edu/api/courses/${CID}/submit`, {title});
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.toast(res.msg);
+  const r = res.data.result;
+  await loadCourse();
+  document.getElementById('score-out').innerHTML = `
+    <div style="margin-top:16px;border-left:4px solid ${r.pass ? '#2a9d8f' : '#d6336c'};padding-left:14px">
+      <b>AI 初评：${r.total} 分 ${r.pass ? '· 通关成功' : '· 未达标'}</b>
+      <div class="dims">
+        ${Object.entries(r.dims).map(([k, v]) => `
+          <div class="dim"><div class="bar"><i style="height:${v}%"></i></div>
+          <b>${v}</b><br><span>${API.esc(k)}</span></div>`).join('')}
+      </div>
+      ${r.weak && r.weak.length ? `<p class="muted" style="margin-top:10px">薄弱维度：${r.weak.map(API.esc).join('、')}，已推送补学内容</p>` : ''}
+    </div>`;
+}
+
+/* ---------- 讲解“视频”：分句字幕推进 ---------- */
+function lessonLines() {
+  const c = courseData.course;
+  const brief = c.brief || '';
+  const segs = [`欢迎来到《${c.name}》。`, ...brief.split(/[，。；]/).map(s => s.trim()).filter(Boolean),
+    '看完讲解后，在下方画板起草你的作业，然后提交通关。'];
+  return segs;
+}
+
+function togglePlay() {
+  playing = !playing;
+  document.getElementById('play').textContent = playing ? '⏸' : '▶';
+  if (playing) {
+    timer = setInterval(() => {
+      const lines = lessonLines();
+      capIdx = (capIdx + 1) % (lines.length + 1);
+      if (capIdx === 0) { togglePlay(); return; }
+      document.getElementById('caption').textContent = lines[capIdx - 1];
+      const total = lines.length * 4;
+      const pos = Math.min(capIdx * 4, total);
+      document.getElementById('play-pos').textContent =
+        '0' + Math.floor(pos / 60) + ':' + String(pos % 60).padStart(2, '0') + ' / 0' + Math.floor(total / 60) + ':' + String(total % 60).padStart(2, '0');
+    }, 2600);
+  } else {
+    clearInterval(timer);
+  }
+}
+
+/* ---------- 笔记 ---------- */
+async function loadNote() {
+  const res = await API.get(`/edu/api/courses/${CID}/note`);
+  if (res.code !== 0) return;
+  document.getElementById('note').value = res.data.content || '';
+  document.getElementById('note-time').textContent =
+    res.data.updated_at ? '上次保存 ' + res.data.updated_at : '尚未保存';
+  document.getElementById('note').addEventListener('input', debounceSaveNote);
+}
+
+let saveTimer = null;
+function debounceSaveNote() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNote, 1200);
+}
+
+async function saveNote() {
+  const res = await API.post(`/edu/api/courses/${CID}/note`,
+    {content: document.getElementById('note').value});
+  if (res.code !== 0) return API.toast(res.msg, false);
+  document.getElementById('note-time').textContent = '已自动保存 ' + new Date().toLocaleTimeString('zh-CN');
+}
+
+/* ---------- 画板 ---------- */
+const board = document.getElementById('board');
+const ctx = board.getContext('2d');
+
+function fitBoard() {
+  const data = board.width ? board.toDataURL() : null;
+  const rect = board.getBoundingClientRect();
+  board.width = rect.width * 2;
+  board.height = rect.height * 2;
+  ctx.scale(2, 2);
+  if (data) {
+    const img = new Image();
+    img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
+    img.src = data;
+  }
+}
+setTimeout(fitBoard, 0);
+window.addEventListener('resize', fitBoard);
+
+function boardXY(e) {
+  const r = board.getBoundingClientRect();
+  const p = e.touches ? e.touches[0] : e;
+  return [p.clientX - r.left, p.clientY - r.top];
+}
+function startDraw(e) { drawing = true; const [x, y] = boardXY(e); ctx.beginPath(); ctx.moveTo(x, y); }
+function doDraw(e) {
+  if (!drawing) return;
+  e.preventDefault();
+  const [x, y] = boardXY(e);
+  ctx.strokeStyle = pen; ctx.lineWidth = penSize; ctx.lineCap = 'round';
+  ctx.lineTo(x, y); ctx.stroke();
+}
+function endDraw() { drawing = false; }
+
+board.addEventListener('mousedown', startDraw);
+board.addEventListener('mousemove', doDraw);
+window.addEventListener('mouseup', endDraw);
+board.addEventListener('touchstart', startDraw, {passive: true});
+board.addEventListener('touchmove', doDraw, {passive: false});
+board.addEventListener('touchend', endDraw);
+
+function setPen(c, el) {
+  pen = c;
+  document.querySelectorAll('.board-tools .color').forEach(x => x.classList.remove('on'));
+  el.classList.add('on');
+}
+function clearBoard() { ctx.clearRect(0, 0, board.width, board.height); }
+
+async function saveBoardToPortfolio() {
+  const me = await API.ensureLogin();
+  if (!me) return location.href = '/login';
+  const title = (document.getElementById('work-title') || {}).value?.trim()
+    || courseData.course.name + ' 画板草稿';
+  const res = await API.post('/create/api/artworks', {
+    title,
+    source: 'course',
+    style_tag: courseData.stage ? courseData.stage.code : '实训画板',
+    note: '来自教学端画板',
+    cover_data: board.toDataURL('image/png'),
+  });
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.toast('画板已存入云端作品集');
+}
+
+loadCourse();
+</script>
+{% endblock %}

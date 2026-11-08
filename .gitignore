@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+instance/
+.env
+*.db
+static/uploads/*
+!static/uploads/.gitkeep
+.idea/
+.DS_Store
+
+# 内部资料不上传公开仓库
+设计/
+_req.txt
+markdown/双Flask项目共存部署配置方案.md

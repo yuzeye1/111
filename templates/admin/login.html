@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}管理后台登录 · 帧集 FrameLab{% endblock %}
+{% block main %}
+<section class="admin-login">
+  <div class="admin-login-card glass">
+    <div class="al-brand">帧集 FrameLab · 管理后台</div>
+    <h1>管理员登录</h1>
+    <p class="al-sub">使用管理员邮箱与密码登录后台</p>
+    <form id="al-form" autocomplete="off">
+      <label>管理员邮箱
+        <input type="email" id="al-email" placeholder="admin@example.com" required>
+      </label>
+      <label>密码
+        <input type="password" id="al-password" placeholder="请输入密码" required>
+      </label>
+      <button class="btn btn-primary al-submit" type="submit">登 录</button>
+    </form>
+    <a class="al-back" href="/">← 返回主站</a>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+  document.getElementById('al-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const res = await API.post('/api/admin/login', {
+      email: document.getElementById('al-email').value,
+      password: document.getElementById('al-password').value,
+    });
+    if (res.code === 0) {
+      API.setToken(res.data.token);
+      location.href = '/admin/';
+    } else {
+      API.toast(res.msg || '登录失败', false);
+    }
+  });
+</script>
+{% endblock %}

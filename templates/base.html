@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}帧集 FrameLab{% endblock %}</title>
+  <link rel="icon" href="/static/img/logo.png">
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+  <div class="global-aurora"></div>
+  <nav class="nav nav-{{ platform or 'main' }}">
+    <a class="logo" href="/"><img src="/static/img/logo.png" alt="">帧集 FrameLab</a>
+    <span class="plat-tag {% if platform == 'edu' %}plat-edu{% elif platform == 'create' %}plat-create{% else %}plat-client{% endif %}">
+      {% if platform == 'edu' %}教育端平台{% elif platform == 'create' %}创作端平台{% else %}帧集主站{% endif %}
+    </span>
+    <span class="spacer"></span>
+    <a class="coin" id="nav-token" href="/me/recharge" style="display:none">0</a>
+    <span class="who" id="nav-user"></span>
+    <a class="item" id="nav-me" href="/me" style="display:none">个人中心</a>
+    <a class="item" id="nav-msg" href="/me#msgbox" style="display:none">消息<span class="nav-dot" id="nav-msg-dot" style="display:none"></span></a>
+    <a class="item" id="nav-settings" href="/me/settings" style="display:none">设置</a>
+    <a class="item" id="nav-admin" href="/admin/" style="display:none">管理后台</a>
+    <a class="item" id="nav-auth" href="/login">登录 / 注册</a>
+  </nav>
+  <main>{% block main %}{% endblock %}</main>
+  <script src="/static/js/api.js"></script>
+  <script>
+    async function refreshMsgBadge() {
+      const dot = document.getElementById('nav-msg-dot');
+      if (!dot) return;
+      const res = await API.get('/api/market/messages');
+      if (res.code !== 0) { dot.style.display = 'none'; return; }
+      dot.textContent = res.data.unread || '';
+      dot.style.display = res.data.unread ? '' : 'none';
+    }
+    (async () => {
+      const me = await API.get('/api/auth/me');
+      const el = document.getElementById('nav-user');
+      const auth = document.getElementById('nav-auth');
+      const meLink = document.getElementById('nav-me');
+      const token = document.getElementById('nav-token');
+      if (me.code === 0 && me.data && (me.data.user || me.data).id) {
+        const u = me.data.user || me.data;
+        el.textContent = `${u.name || '同学'} · ${levelBadge(me.data.level || u.level || 1)} · ${u.points}积分`;
+        auth.textContent = '退出';
+        auth.href = 'javascript:API.logout()';
+        meLink.style.display = '';
+        document.getElementById('nav-settings').style.display = '';
+        document.getElementById('nav-msg').style.display = '';
+        if (u.is_admin) document.getElementById('nav-admin').style.display = '';
+        token.style.display = '';
+        token.textContent = (u.tokens || 0) + ' Token';
+        refreshMsgBadge();
+        setInterval(refreshMsgBadge, 30000);
+      } else {
+        el.textContent = '';
+      }
+    })();
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

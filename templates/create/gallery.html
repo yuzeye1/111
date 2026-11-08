@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% set platform = 'create' %}
+{% block title %}美学鉴赏 — 帧集 FrameLab{% endblock %}
+{% block main %}
+<div class="wrap">
+  <div class="page-head ph-create">
+    <h1>美学鉴赏</h1>
+    <p>按流派 · 风格 · 关键词筛选，瀑布流浏览，点击卡片查看大图与五维美学解读</p>
+    <div class="plat-switch">
+      <a class="chip chip-client" href="/create/index">← 回创作端</a>
+      <a class="chip chip-edu" href="/edu/shelf">帧集优集</a>
+    </div>
+  </div>
+
+  <!-- 筛选栏 -->
+  <div class="market-head">
+    <b style="color:var(--text);flex:none">筛选</b>
+    <div id="gallery-filters" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+    <input id="g-kw" placeholder="🔍 搜索作品 / 艺术家…" oninput="loadGallery()"
+      style="padding:8px 14px;border-radius:999px;border:1.5px solid var(--border-strong);background:var(--bg-soft);color:var(--text);min-width:180px;margin-left:auto">
+  </div>
+
+  <!-- 瀑布流 -->
+  <div class="masonry" id="gallery-grid"></div>
+</div>
+
+<!-- 大图预览弹窗 -->
+<div class="modal-mask" id="preview-modal" style="display:none" onclick="if(event.target===this)closePreview()">
+  <div class="modal-body" id="preview-body"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const CATS = ['全部', '经典艺术', '现代商业', '小众创意', '美学理论'];
+let curCat = '全部', loaded = [];
+
+document.getElementById('gallery-filters').innerHTML =
+  CATS.map(c => `<span class="chip ${c === curCat ? 'on' : ''}" onclick="setCat('${c}')">${c}</span>`).join('');
+
+function setCat(c) {
+  curCat = c;
+  document.querySelectorAll('#gallery-filters .chip').forEach(e => e.classList.remove('on'));
+  event.target.classList.add('on');
+  loadGallery();
+}
+
+async function loadGallery() {
+  const q = new URLSearchParams({cat: curCat, kw: document.getElementById('g-kw').value.trim()});
+  const res = await API.get('/create/api/materials?' + q);
+  if (res.code !== 0) return;
+  loaded = res.data;
+  document.getElementById('gallery-grid').innerHTML = loaded.map((m, i) => `
+    <div class="card" style="cursor:pointer;animation:panel-fade .5s ${Math.min(i * 60, 600)}ms both"
+      onclick="openPreview(${m.id})">
+      <div class="cover" style="background:${API.coverCss(m.cover)}"></div>
+      <div class="body">
+        <h4>${API.esc(m.title)}</h4>
+        <div class="meta">${API.esc(m.style)} · ${API.esc(m.artist || '')}</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <span class="chip chip-sm" style="font-size:11px;padding:2px 9px;background:rgba(167,139,250,.16);color:var(--acc-create)">${API.esc(m.cat)}</span>
+          <button class="btn btn-ghost btn-sm" style="margin-left:auto"
+            onclick="event.stopPropagation();favMaterial(${m.id})">收藏</button>
+        </div>
+      </div>
+    </div>`).join('') || '<div class="empty" style="column-span:all">没有匹配的素材，换个筛选试试</div>';
+}
+
+async function openPreview(id) {
+  const m = loaded.find(x => x.id === id);
+  if (!m) return;
+  const rows = Object.entries(m.analysis || {}).map(([k, v]) => `
+    <p style="margin:8px 0;line-height:1.8"><b style="color:var(--acc-create)">${API.esc(k)}：</b>${API.esc(v)}</p>`).join('');
+  const downloadable = (m.cover || '').startsWith('/');
+  document.getElementById('preview-body').innerHTML = `
+    <button class="btn btn-ghost btn-sm" style="position:absolute;top:14px;right:14px" onclick="closePreview()">✕ 关闭</button>
+    <div style="display:flex;gap:24px;flex-wrap:wrap">
+      <div class="cover" style="width:340px;height:340px;border-radius:18px;flex:none;background:${API.coverCss(m.cover)}"></div>
+      <div style="flex:1;min-width:260px">
+        <h3 style="margin-bottom:6px">${API.esc(m.title)}</h3>
+        <p class="muted">${API.esc(m.cat)} · ${API.esc(m.style)} · ${API.esc(m.artist || '')} ${API.esc(m.year || '')}<br>适用场景：${API.esc(m.scene || '')}</p>
+        <div style="margin-top:14px">${rows || '<p class="muted">暂无解析</p>'}</div>
+        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+          <button class="btn btn-sm" onclick="favMaterial(${m.id})">加入对标收藏</button>
+          ${downloadable
+            ? `<a class="btn btn-ghost btn-sm" href="${API.esc(m.cover)}" download>保存到本地</a>`
+            : '<span class="muted" style="font-size:12.5px;align-self:center">渐变示意稿可在收藏夹中随时回看</span>'}
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('preview-modal').style.display = 'flex';
+}
+
+function closePreview() {
+  document.getElementById('preview-modal').style.display = 'none';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePreview(); });
+
+async function favMaterial(id) {
+  const res = await API.post('/edu/api/favorites', {material_id: id});
+  API.toast(res.msg, res.code === 0);
+}
+
+loadGallery();
+</script>
+{% endblock %}

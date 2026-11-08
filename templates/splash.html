@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>帧集 FrameLab — 开始</title>
+  <link rel="icon" href="/static/img/logo.png">
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<section class="splash" id="splash">
+  <!-- 黑紫星云动态背景 -->
+  <div class="sp-nebula"></div>
+  <div class="sp-stars" id="sp-stars"></div>
+  <div class="sp-diag sp-diag-1"></div>
+  <div class="sp-diag sp-diag-2"></div>
+  <div class="sp-vignette"></div>
+
+  <!-- 顶部：品牌 + 可编辑日期 -->
+  <div class="sp-top">
+    <span class="sp-brand"><img src="/static/img/logo.png" alt="">帧集 FrameLab</span>
+    <span class="sp-date" id="today" contenteditable="true" spellcheck="false"
+          title="点击可编辑日期备注"></span>
+  </div>
+
+  <!-- 中央：标识 + 品牌标题 -->
+  <div class="sp-center">
+    <img class="sp-logo" src="/static/img/logo.png" alt="帧集 FrameLab 标识">
+    <h1>帧集</h1>
+    <p class="sp-sub">· 让每一帧热爱被看见 ·</p>
+  </div>
+
+  <!-- 四端入口（内部导航，专门图标，不展示外链） -->
+  <div class="sp-entries" id="sp-entries"></div>
+
+  <!-- 左下注册登录 / 右下跳转主页 -->
+  <div class="sp-bottom">
+    <a class="sp-btn" href="/login">注册 / 登录</a>
+    <a class="sp-btn" href="/index">跳转主页 →</a>
+  </div>
+</section>
+<script>
+/* 四端专属线性图标（stroke 继承 CSS） */
+const ENTRY_ICONS = {
+  client: '<rect x="2.5" y="7" width="19" height="13.5" rx="2.5"/><path d="M8.5 7V5.2A2.2 2.2 0 0 1 10.7 3h2.6a2.2 2.2 0 0 1 2.2 2.2V7"/><path d="M2.5 12.5h19"/><path d="M10.5 12.5v2h3v-2"/>',
+  edu: '<path d="M22 9.5L12 4.5 2 9.5l10 5 10-5z"/><path d="M6 11.8v5.4c0 1.7 2.7 3.1 6 3.1s6-1.4 6-3.1v-5.4"/><path d="M22 9.5v5.5"/>',
+  create: '<path d="M12 19.5l7.5-7.5 3 3-7.5 7.5-3-3z"/><path d="M18.5 13.5L16.8 5 2.5 2.5 5 16.8 13.5 18.5l5-5z"/><circle cx="11" cy="11" r="2.2"/>',
+  premium: '<path d="M6.5 3h11L22 9.2 12 21.2 2 9.2z"/><path d="M11 3L8 9.2l4 12 4-12-3-6.2"/><path d="M2 9.2h20"/>',
+};
+
+/* 四端入口：内部路由，不在此展示外链 */
+const ENTRIES = [
+  {name: '客户端', desc: '派单 · 匹配 · 交付', url: '/client/index', icon: 'client', tone: 'client'},
+  {name: '教育端', desc: '闯关 · 实训 · 课程', url: '/edu/index', icon: 'edu', tone: 'edu'},
+  {name: '创作端', desc: '灵感 · 生成 · 作品集', url: '/create/index', icon: 'create', tone: 'create'},
+  {name: '帧集优集', desc: '精选 · 书架 · 鉴赏', url: '/edu/shelf', icon: 'premium', tone: 'premium'},
+];
+
+document.getElementById('sp-entries').innerHTML = ENTRIES.map(e => `
+  <a class="sp-entry tone-${e.tone}" href="${e.url}">
+    <span class="sp-entry-ico"><svg viewBox="0 0 24 24">${ENTRY_ICONS[e.icon]}</svg></span>
+    <span class="sp-entry-txt"><b>${e.name}</b><small>${e.desc}</small></span>
+    <span class="sp-entry-go">→</span>
+  </a>`).join('');
+
+/* 星点：随机分布的暗紫微光（纯装饰） */
+(function () {
+  const box = document.getElementById('sp-stars');
+  let html = '';
+  for (let i = 0; i < 60; i++) {
+    const x = Math.random() * 100, y = Math.random() * 100;
+    const s = (Math.random() * 2 + 0.6).toFixed(1);
+    const d = (Math.random() * 5 + 3).toFixed(1);
+    const o = (Math.random() * 0.5 + 0.2).toFixed(2);
+    html += `<i style="left:${x}%;top:${y}%;width:${s}px;height:${s}px;opacity:${o};animation-duration:${d}s"></i>`;
+  }
+  box.innerHTML = html;
+})();
+
+/* 右上可编辑日期（本地缓存） */
+const savedDate = localStorage.getItem('framelab_splash_date');
+document.getElementById('today').textContent = savedDate || new Date().toLocaleDateString('zh-CN', {
+  year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+document.getElementById('today').addEventListener('blur', e => {
+  localStorage.setItem('framelab_splash_date', e.target.textContent.trim());
+});
+</script>
+</body>
+</html>

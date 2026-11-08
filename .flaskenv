@@ -1,0 +1,2 @@
+FLASK_APP=app:app
+FLASK_RUN_PORT=5001

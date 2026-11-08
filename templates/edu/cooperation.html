@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% set platform = 'edu' %}
+{% block title %}教育合作 — 帧集 FrameLab{% endblock %}
+{% block main %}
+<div class="wrap">
+  <div class="page-head ph-edu" style="position:relative">
+    <h1>教育合作</h1>
+    <p>院校共建课程 · 机构供给命题与工具 · 大厂青苗直通实习</p>
+    <div class="plat-switch">
+      <a class="chip chip-client" href="/edu/index">← 回教育端</a>
+      <a class="chip chip-edu" href="/edu/shelf">帧集优集</a>
+      <a class="chip chip-client" href="/index#internships">实习通道 →</a>
+    </div>
+    <!-- 右上：个人中心 + 搜索 -->
+    <div style="position:absolute;top:22px;right:26px;display:flex;gap:10px;align-items:center">
+      <a class="chip chip-create" href="/me" title="个人中心">👤 个人中心</a>
+      <input id="p-kw" placeholder="🔍 搜索合作方…" oninput="loadPartners()"
+        style="padding:8px 14px;border-radius:999px;border:1.5px solid var(--border-strong);background:var(--bg-soft);color:var(--text);min-width:170px">
+    </div>
+  </div>
+  <div class="grid cols-3" id="partners"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const KINDS = ['院校', '机构', '大厂青苗'];
+const ICONS = {'院校': '🏫', '机构': '🤝', '大厂青苗': '🌱'};
+let expanded = null;
+
+async function loadPartners() {
+  const kw = document.getElementById('p-kw').value.trim();
+  const res = await API.get('/edu/api/partners?kw=' + encodeURIComponent(kw));
+  if (res.code !== 0) return;
+  document.getElementById('partners').innerHTML = KINDS.map(kind => {
+    const list = res.data[kind] || [];
+    return `
+      <div class="card" style="padding:20px">
+        <h3 style="color:var(--text);margin-bottom:14px">${ICONS[kind] || ''} ${kind}</h3>
+        ${list.map(p => `
+          <div class="partner-row" style="padding:10px 0;border-bottom:1px dashed var(--border)">
+            <div style="display:flex;gap:12px;align-items:center;cursor:pointer" onclick="toggleApply(${p.id}, this)">
+              <div style="width:44px;height:44px;border-radius:12px;flex:none;background:${API.coverCss(p.cover)}"></div>
+              <div style="flex:1">
+                <b style="font-size:14px">${API.esc(p.name)}</b>
+                <p class="muted" style="margin-top:4px;line-height:1.6">${API.esc(p.desc || '')}</p>
+              </div>
+              <span style="color:var(--acc-create);font-size:12px;font-weight:700;flex:none">展开 ▾</span>
+            </div>
+            <div class="apply-box" data-pid="${p.id}" style="display:none;margin-top:12px;background:var(--bg-elev);border-radius:12px;padding:14px">
+              <b style="font-size:13px;color:var(--acc-edu)">合作细则 · 申报表单</b>
+              <p style="font-size:12.5px;line-height:1.8;margin-top:6px;color:var(--muted)">
+                ${kind === '院校' ? '课程共建：美学赏析 + 闯关实训课程包入驻院校选修课；教师端看板跟踪学生六维成长。' : ''}
+                ${kind === '机构' ? '命题与工具供给：真实商业命题进入闯关题库，行业讲师参与双轨评分。' : ''}
+                ${kind === '大厂青苗' ? '青苗直通：通关 L3 以上学员定向推送实习面邀，简历直达业务负责人。' : ''}
+              </p>
+              <div style="display:grid;gap:8px;margin-top:10px">
+                <input class="ap-name" placeholder="申报人姓名（默认账户昵称）" style="padding:9px 12px;border-radius:9px;border:1.5px solid var(--border-strong);background:var(--bg-soft);color:var(--text)">
+                <input class="ap-contact" placeholder="联系方式（默认注册邮箱）" style="padding:9px 12px;border-radius:9px;border:1.5px solid var(--border-strong);background:var(--bg-soft);color:var(--text)">
+                <textarea class="ap-note" placeholder="补充说明（院校/机构可附简介）" style="padding:9px 12px;border-radius:9px;border:1.5px solid var(--border-strong);background:var(--bg-soft);color:var(--text);min-height:60px"></textarea>
+              </div>
+              <button class="btn btn-sm" style="margin-top:10px" onclick="doApply(${p.id}, '${API.esc(p.name)}')">提交申报</button>
+            </div>
+          </div>`).join('') || '<p class="muted">暂无</p>'}
+      </div>`;
+  }).join('');
+}
+
+function toggleApply(pid, el) {
+  const box = el.parentElement.querySelector('.apply-box');
+  const show = box.style.display === 'none';
+  box.style.display = show ? 'block' : 'none';
+  el.querySelector('span:last-child').textContent = show ? '收起 ▴' : '展开 ▾';
+}
+
+async function doApply(pid, name) {
+  const box = document.querySelector(`.apply-box[data-pid="${pid}"]`);
+  const res = await API.post('/edu/api/partners/apply', {
+    partner_id: pid,
+    name: box.querySelector('.ap-name').value.trim(),
+    contact: box.querySelector('.ap-contact').value.trim(),
+    note: box.querySelector('.ap-note').value.trim(),
+  });
+  API.toast(res.msg, res.code === 0);
+  if (res.code === 0) box.style.display = 'none';
+}
+loadPartners();
+</script>
+{% endblock %}

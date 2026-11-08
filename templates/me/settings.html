@@ -1,0 +1,177 @@
+{% extends 'me/base.html' %}
+{% set me_nav = 'settings' %}
+{% block me_content %}
+<h2 style="color:var(--c-client-5)">通用设置</h2>
+
+<div class="settings-layout" style="margin-top:16px">
+  <!-- 左侧固定竖向侧栏 -->
+  <nav class="settings-nav" id="settings-nav"></nav>
+
+  <!-- 中部面板：淡入淡出切换 -->
+  <div class="settings-panel card" style="padding:26px;min-height:420px">
+    <div id="panel-holder"></div>
+  </div>
+
+  <!-- 右侧：反馈送 Token 专属板块（上）+ 圆形回主页（下） -->
+  <aside class="settings-side">
+    <div class="fb-block">
+      <h3 style="font-size:15px">反馈送 Token <span class="chip" style="font-size:11px">有效反馈 +2</span></h3>
+      <div class="field" style="margin-top:12px">
+        <textarea id="fb-content" rows="5" placeholder="哪里不好用、想要什么功能，告诉我们（≥10 字）"></textarea>
+      </div>
+      <button class="btn btn-sm" onclick="sendFeedback()">提交反馈</button>
+    </div>
+    <a class="home-fab" href="/index" title="回主页">⌂</a>
+  </aside>
+</div>
+{% endblock %}
+{% block me_scripts %}
+<script>
+const PANELS = [
+  {id: 'general',  label: '⚙️ 通用设置'},
+  {id: 'sound',    label: '🔔 声音设置'},
+  {id: 'storage',  label: '💾 储存设置'},
+  {id: 'quality',  label: '🖼 画质设置'},
+  {id: 'privacy',  label: '🔐 权限设置'},
+  {id: 'about',    label: 'ℹ️ 关于我们'},
+  {id: 'feedback', label: '💬 问题反馈'},
+];
+let curPanel = localStorage.getItem('framelab_settings_panel') || 'general';
+
+function renderNav() {
+  document.getElementById('settings-nav').innerHTML = PANELS.map(p => `
+    <a class="${p.id === curPanel ? 'on' : ''}" onclick="showPanel('${p.id}')" style="cursor:pointer">${p.label}</a>`).join('');
+}
+
+function esc(s) { return API.esc(s); }
+
+function panelHTML(id) {
+  const pref = k => localStorage.getItem('framelab_pref_' + k);
+  switch (id) {
+    case 'general':
+      return `
+        <h3>通用偏好</h3>
+        <div class="field" style="margin-top:14px"><label>界面语言</label>
+          <div class="radio-row"><label><input type="radio" name="lang" checked> 简体中文</label><label><input type="radio" name="lang" disabled> English（即将上线）</label></div></div>
+        <div class="field" style="margin-top:14px"><label>动效强度（波纹 / 转盘 / 极光）</label>
+          <input type="range" id="s-motion" min="0" max="100" value="${pref('motion') || 70}"
+            oninput="savePref('motion', this.value); this.style.setProperty('--v', this.value + '%')"></div>
+        <p class="muted" id="pref-note" style="margin-top:10px"></p>`;
+    case 'sound':
+      return `
+        <h3>声音设置</h3>
+        <div class="field" style="margin-top:14px"><label>提示音量</label>
+          <input type="range" id="s-sound" min="0" max="100" value="${pref('sound') || 60}"
+            oninput="savePref('sound', this.value); this.style.setProperty('--v', this.value + '%')"></div>
+        <div class="field" style="margin-top:14px"><label>消息提示音</label>
+          <div class="radio-row"><label><input type="radio" name="msgsound" checked> 开启</label><label><input type="radio" name="msgsound" onclick="savePref('msgsound','off')"> 静音</label></div></div>
+        <p class="muted" style="margin-top:10px">本地缓存存储，下次进入自动恢复。</p>`;
+    case 'storage':
+      return `
+        <h3>储存设置</h3>
+        <p class="muted" style="margin-top:10px" id="storage-info">登录后查看空间用量。</p>
+        <div class="field" style="margin-top:16px"><label>画板草稿保留天数</label>
+          <div class="radio-row">
+            <label><input type="radio" name="keep" value="7"> 7 天</label>
+            <label><input type="radio" name="keep" value="30" checked> 30 天</label>
+            <label><input type="radio" name="keep" value="999"> 永久</label>
+          </div></div>
+        <a class="btn btn-coin btn-sm" style="display:inline-block;margin-top:16px" href="/me/recharge">升级订阅扩容 →</a>`;
+    case 'quality':
+      return `
+        <h3>画质设置</h3>
+        <div class="field" style="margin-top:14px"><label>画布画质（预览锐度）</label>
+          <input type="range" id="s-quality" min="1" max="3" value="${pref('quality') || 2}"
+            oninput="savePref('quality', this.value); this.style.setProperty('--v', ((this.value - 1) / 2 * 100) + '%')"></div>
+        <div class="field" style="margin-top:14px"><label>档位说明</label>
+          <div class="radio-row">
+            <label><input type="radio" name="qmode" value="1" ${pref('quality') === '1' ? 'checked' : ''}> 流畅（省流量）</label>
+            <label><input type="radio" name="qmode" value="2" ${!pref('quality') || pref('quality') === '2' ? 'checked' : ''}> 均衡（推荐）</label>
+            <label><input type="radio" name="qmode" value="3" ${pref('quality') === '3' ? 'checked' : ''}> 高清（作品展示）</label>
+          </div></div>
+        <p class="muted" style="margin-top:10px">画质档位影响预览锐度，导出原图不受影响。</p>`;
+    case 'privacy':
+      return `
+        <h3>权限设置</h3>
+        <p style="margin-top:12px;line-height:2">作品默认 <b>完全公开</b>，可在作品详情页切换为「仅甲方可见」或「私有」；公开主页与派单报名需要你主动提交。
+        浏览器本地缓存仅保存界面偏好（音量 / 画质 / 动效），不存任何作品与账户数据。</p>
+        <p class="muted" style="margin-top:10px">Token 与作品数据均保存在平台云端，可随时在资产明细中核对流水。</p>`;
+    case 'about':
+      return `
+        <h3>关于我们</h3>
+        <p style="margin-top:12px;line-height:2">帧集 FrameLab · 校园设计全链路成长平台<br>
+        教育端 · 创作端 · 接单端 三平台联动<br>当前版本 v2.0（波纹 / 转盘 / 极光版）</p>
+        <p class="muted" style="margin-top:10px">联系合作：campus@framelab.demo</p>`;
+    case 'feedback':
+      return `
+        <h3>问题反馈</h3>
+        <p class="muted" style="margin-top:10px">在右侧「反馈送 Token」板块提交，有效反馈每条 +2 Token。</p>
+        <div id="fb-list" style="margin-top:14px"></div>`;
+  }
+  return '';
+}
+
+function showPanel(id) {
+  curPanel = id;
+  localStorage.setItem('framelab_settings_panel', id);
+  renderNav();
+  const holder = document.getElementById('panel-holder');
+  holder.style.animation = 'none';
+  holder.innerHTML = panelHTML(id);
+  holder.offsetHeight;   // 重置动画
+  holder.style.animation = 'panel-fade .35s ease';
+  if (id === 'storage') loadStorage();
+  if (id === 'feedback') loadFeedback();
+}
+
+function savePref(k, v) {
+  localStorage.setItem('framelab_pref_' + k, v);
+  const note = document.getElementById('pref-note');
+  if (note) note.textContent = '已保存（本地缓存）：' + k + ' = ' + v;
+}
+
+async function loadStorage() {
+  const me = await API.ensureLogin();
+  if (!me) {
+    document.getElementById('storage-info').textContent = '登录后查看空间用量。';
+    return;
+  }
+  const res = await API.get('/api/market/wallet');
+  if (res.code !== 0) return;
+  const meFull = await API.get('/api/auth/me');
+  const used = meFull.data && meFull.data.user ? (meFull.data.user.storage_used / 1024 ** 3).toFixed(2) : 0;
+  document.getElementById('storage-info').textContent =
+    `已用 ${used}GB / ${res.data.storage_free}GB（${res.data.tier_name}），升级订阅可扩容。`;
+}
+
+async function sendFeedback() {
+  const me = await API.ensureLogin();
+  if (!me) return location.href = '/login';
+  const content = document.getElementById('fb-content').value.trim();
+  const res = await API.post('/api/market/feedback', {content});
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.toast(res.msg);
+  document.getElementById('fb-content').value = '';
+  refreshMeCoin();
+  loadFeedback();
+}
+
+async function loadFeedback() {
+  const el = document.getElementById('fb-list');
+  if (!el) return;
+  const me = await API.ensureLogin();
+  if (!me) { el.innerHTML = '<p class="muted">登录后查看反馈记录。</p>'; return; }
+  const res = await API.get('/api/market/feedback/mine');
+  if (res.code !== 0) return;
+  el.innerHTML = res.data.items.map(f => `
+    <div class="trace-item" style="margin-top:8px">
+      <span class="ic">💬</span>
+      <span style="flex:1">${API.esc(f.content)}</span>
+      <span class="when">+${f.tokens_awarded} Token</span>
+    </div>`).join('') || '<p class="muted">还没有反馈记录。</p>';
+}
+
+renderNav();
+showPanel(curPanel);
+</script>
+{% endblock %}

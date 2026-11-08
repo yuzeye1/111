@@ -1,0 +1,288 @@
+{% extends 'base.html' %}
+{% set platform = 'create' %}
+{% block title %}创作端 — 帧集 FrameLab{% endblock %}
+{% block main %}
+<div class="wrap">
+  <!-- 超大英文标题 + 极光弥散放射 -->
+  <div class="page-head ph-create" style="position:relative;overflow:hidden;padding:56px 32px;text-align:center;">
+    <div class="aurora" style="opacity:.55"></div>
+    <div style="position:relative;z-index:2;display:inline-block;padding:34px 84px;border-radius:999px;background:rgba(255,255,255,.06);backdrop-filter:blur(6px);border:1px solid var(--border-strong)">
+      <p style="letter-spacing:8px;color:var(--muted);font-size:15px;margin-bottom:8px">创作端平台</p>
+      <h1 style="font-size:52px;letter-spacing:14px;color:var(--c-create-5);font-weight:900">CREATE</h1>
+    </div>
+    <p style="position:relative;z-index:2;margin-top:22px;color:var(--text-2);font-size:14px;letter-spacing:2px">
+      极光扩散 · 灵感 → 创作 → 作品集 · 曝光解锁工作流转教学</p>
+    <div class="plat-switch" style="justify-content:center">
+      <a class="chip chip-client" href="/index">← 回到主控</a>
+      <a class="chip chip-edu" href="/edu/index">前往教育端平台</a>
+      <a class="chip" style="background:rgba(242,201,76,.16);color:var(--gold)" href="/me/recharge" id="tier-chip">Token 订阅</a>
+    </div>
+  </div>
+
+  <!-- 中心圆形个人中心入口 -->
+  <div style="text-align:center;margin:26px 0 20px">
+    <a href="/me" style="display:inline-flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none">
+      <span style="width:92px;height:92px;border-radius:50%;background:conic-gradient(from 90deg,#6A4DD4,#A4A7E3,#F2D2FF,#6A4DD4);display:flex;align-items:center;justify-content:center;color:#fff;font-size:30px;font-weight:800;box-shadow:0 14px 34px rgba(106,77,212,.35);transition:transform .3s"
+        onmouseover="this.style.transform='scale(1.08)'" onmouseout="this.style.transform=''">帧</span>
+      <b style="color:var(--text-2);font-size:14px">个人中心</b>
+    </a>
+  </div>
+
+  <!-- 四等分板块 -->
+  <div class="quad-grid">
+    <a class="quad-card quad-tl" href="/create/gallery">
+      <h4>美学鉴赏参考</h4>
+      <p>瀑布流浏览经典与商业案例，大图解读五维美学解析，一键收藏对标。</p>
+      <b style="font-size:13px">进入美学鉴赏 →</b>
+    </a>
+    <a class="quad-card quad-tr" href="/create/studio">
+      <h4>创作创建</h4>
+      <p>提示词 + 风格 + 模型（nano banana / lib AI），AI 生成直出画布，生成历史随时回溯。</p>
+      <b style="font-size:13px">进入创作画布 →</b>
+    </a>
+    <a class="quad-card quad-bl" href="#inspire-section">
+      <h4>创作推送与充值</h4>
+      <p>每日灵感推送、AI 唤醒六维方案；Token 订阅升级空间与次数。</p>
+      <span style="display:inline-block;margin-top:8px;margin-right:8px" class="btn btn-coin btn-sm">生成灵感方案</span>
+      <span class="btn btn-sm" style="background:var(--acc-create);color:#0b0d17">去充值 →</span>
+    </a>
+    <a class="quad-card quad-br" href="/create/shelf">
+      <h4>参考册与作品集</h4>
+      <p>云端作品集书架：排序浏览、一键生成在线作品集、一键导出求职简历。</p>
+      <b style="font-size:13px">打开我的书架 →</b>
+    </a>
+  </div>
+
+  <!-- 创作创建：灵感方案生成器 -->
+  <h2 class="section-title" id="inspire-section">创作创建 · 灵感方案生成器</h2>
+  <div class="card" style="padding:24px">
+    <div class="grid cols-3">
+      <div class="field">
+        <label>创作主题</label>
+        <input id="in-theme" placeholder="如：校园音乐节主视觉">
+      </div>
+      <div class="field">
+        <label>风格方向</label>
+        <select id="in-style">
+          <option>扁平商业</option><option>三维写实</option><option>国潮</option>
+          <option>极简</option><option>酸性</option><option>涂鸦</option><option>像素</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>创作痛点</label>
+        <select id="in-pain">
+          <option>风格同质化严重</option><option>构图缺乏张力</option>
+          <option>色彩搭配混乱</option><option>画面缺乏层次</option>
+          <option>创意概念平淡</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn" onclick="inspire()">AI 唤醒 · 生成六维灵感方案</button>
+    <span class="muted" id="inspire-quota"></span>
+    <div id="inspire-result"></div>
+  </div>
+
+  <h2 class="section-title">创作推送 · 今日灵感</h2>
+  <div class="push-grid">
+    <div class="push-card"><b>灵感工作流精选</b><p id="push-design">加载中…</p></div>
+    <div class="push-card"><b>充值 / 订阅</b>
+      <p>免费版每天 5 次灵感、1GB 空间；Token 升级「创作 Plus」可扩容提速。</p>
+      <a class="btn btn-coin btn-sm" style="margin-top:10px;display:inline-block" href="/me/recharge">去充值升级</a>
+    </div>
+  </div>
+
+  <h2 class="section-title">专业工具平台 · 跳转官方软件创作（未安装先到官网下载）</h2>
+  <div class="grid cols-3" id="tools"></div>
+
+  <h2 class="section-title">创作资源导航 · 灵感 / 字体 / 图库 / 图标 / 免抠（外链直达）</h2>
+  <div class="res-grid" id="res-nav"></div>
+
+  <h2 class="section-title" id="upload">上传工作流 · 上传作品到云端作品集</h2>
+  <div class="card" style="padding:24px">
+    <div class="grid cols-3">
+      <div class="field"><label>作品标题</label><input id="up-title" placeholder="作品标题"></div>
+      <div class="field"><label>风格标签</label><input id="up-style" placeholder="如 国潮 / 扁平商业"></div>
+      <div class="field"><label>作品文件（≤25MB）</label><input id="up-file" type="file"></div>
+    </div>
+    <button class="btn" onclick="uploadWork()">上传作品</button>
+    <span class="muted" id="storage-note">上传时间即原创时间戳</span>
+  </div>
+
+  <h2 class="section-title">我的作品集 · 实时风格分析与自动排版</h2>
+  <div id="portfolio-box"></div>
+
+  <h2 class="section-title">工作流案例广场</h2>
+  <div class="grid cols-2" id="cases"></div>
+
+  <!-- 底部回主页通栏 -->
+  <a href="/index" class="dark-diffuse" style="display:block;text-align:center;text-decoration:none;color:#fff;margin-top:28px;padding:30px">
+    <b style="font-size:17px;letter-spacing:4px">← 回 到 总 主 页 →</b>
+    <p style="margin:0;font-size:13px">教育端 · 创作端 · 接单端 · 一键直达</p>
+  </a>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadTier() {
+  const w = await API.get('/api/market/wallet');
+  if (w.code === 0) {
+    const chip = document.getElementById('tier-chip');
+    chip.textContent = w.data.logged_in
+      ? `${w.data.tier_name} · ${w.data.tokens} Token`
+      : 'Token 订阅（登录）';
+    if (w.data.logged_in) {
+      document.getElementById('storage-note').textContent =
+        `当前 ${w.data.tier_name}：空间 ${w.data.storage_free}GB · 上传时间即原创时间戳`;
+    }
+  }
+}
+
+async function inspire() {
+  const theme = document.getElementById('in-theme').value.trim();
+  if (!theme) return API.toast('请填写创作主题', false);
+  const res = await API.post('/create/api/inspire', {
+    theme,
+    style: document.getElementById('in-style').value,
+    pain: document.getElementById('in-pain').value,
+  });
+  if (res.code !== 0) return API.toast(res.msg, false);
+  const d = res.data;
+  document.getElementById('inspire-quota').textContent =
+    ` 今日剩余免费次数：${d.remain_free}`;
+  document.getElementById('inspire-result').innerHTML = `
+    <div style="margin-top:18px;line-height:2;font-size:14.5px">
+      <p><b>创意方向：</b>${API.esc(d.creative)}</p>
+      <p><b>风格建议：</b>${API.esc(d.style_rec)}</p>
+      <p><b>构图策略：</b>${API.esc(d.compose)}</p>
+      <p><b>配色方案：</b>${API.esc(d.palette.logic)}</p>
+      <div class="swatch-row">${d.palette.swatches.map(s =>
+        `<div class="swatch" style="background:${s}" title="${s}"></div>`).join('')}</div>
+      <p><b>画面亮点：</b>${API.esc(d.highlight)}</p>
+      <p><b>避坑清单：</b>${d.pitfalls.map(p => API.esc(p)).join('；')}</p>
+      <p style="background:var(--bg-elev);border-radius:10px;padding:12px"><b>可用提示词：</b>${API.esc(d.prompt)}</p>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="saveWorkflow()">把方案存为我的工作流模板</button>
+      <a class="btn btn-ghost btn-sm" href="/create/studio">带着提示词去创作画布 →</a>
+    </div>`;
+  window._lastInspire = d;
+}
+
+async function saveWorkflow() {
+  const name = prompt('给模板起个名字：', '灵感模板 - ' + document.getElementById('in-theme').value);
+  if (!name) return;
+  const res = await API.post('/create/api/workflows',
+    {name, prompt: window._lastInspire.prompt});
+  API.toast(res.msg, res.code === 0);
+}
+
+async function loadTools() {
+  const res = await API.get('/create/api/tools');
+  if (res.code !== 0) return;
+  document.getElementById('tools').innerHTML = res.data.map(t => `
+    <div class="card" style="padding:20px;cursor:pointer" onclick="window.open('${t.url}','_blank')">
+      <b>${API.esc(t.name)}</b>
+      <p class="muted" style="margin-top:8px;line-height:1.7">${API.esc(t.desc)}</p>
+      <p style="margin-top:10px;color:var(--acc-create);font-size:13px;font-weight:600">前往软件官网 / 下载 →</p>
+    </div>`).join('');
+}
+
+async function uploadWork() {
+  const title = document.getElementById('up-title').value.trim();
+  if (!title) return API.toast('请填写作品标题', false);
+  const fd = new FormData();
+  fd.append('title', title);
+  fd.append('style_tag', document.getElementById('up-style').value.trim() || '未分类');
+  const f = document.getElementById('up-file').files[0];
+  if (f) fd.append('file', f);
+  const res = await API.upload('/create/api/artworks', fd);
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.toast('作品已存入云端作品集');
+  document.getElementById('up-title').value = '';
+  loadPortfolio();
+}
+
+async function loadPortfolio() {
+  const me = await API.ensureLogin();
+  const box = document.getElementById('portfolio-box');
+  if (!me) { box.innerHTML = '<p class="muted">登录后查看你的云端作品集。</p>'; return; }
+  const res = await API.get(`/create/api/portfolio/${me.id}`);
+  if (res.code !== 0) return;
+  const d = res.data;
+  box.innerHTML = `
+    <p class="muted" style="margin-bottom:12px">共 ${d.total} 件作品 · 覆盖 ${d.styles} 种风格（按风格自动排版）· <a href="/create/shelf" style="color:var(--acc-create)">书架视图 →</a></p>` +
+    d.layout.map(g => `
+      <div style="margin-bottom:22px">
+        <b style="color:var(--acc-create)">${API.esc(g.style)}（${g.count}）</b>
+        <div class="grid cols-4" style="margin-top:10px">
+          ${g.items.map(a => `
+            <div class="card" style="cursor:pointer" onclick="location.href='/create/artwork/${a.id}'">
+              <div class="cover" style="background:${API.coverCss(a.cover)}"></div>
+              <div class="body"><h4>${API.esc(a.title)}</h4>
+              <div class="meta">${a.source === 'order' ? '商单成交' : a.source === 'course' ? '闯关实训' : '个人创作'} · ${a.created_at || ''}</div></div>
+            </div>`).join('')}
+        </div>
+      </div>`).join('') || '<div class="empty">还没有作品，去创作第一件吧</div>';
+}
+
+async function loadCases() {
+  const res = await API.get('/create/api/workflow-cases');
+  if (res.code !== 0) return;
+  document.getElementById('cases').innerHTML = res.data.map(c => `
+    <div class="card" style="padding:20px">
+      <b>${API.esc(c.title)}</b>
+      <p class="muted" style="margin-top:8px;line-height:1.8">
+        ${(c.steps || []).map(s => `【${API.esc(s.step)}】${API.esc(s.content)}`).join('<br>')}
+      </p>
+    </div>`).join('') || '<div class="empty">暂无公开案例 · 曝光度达 500 即可发布你的工作流反哺教学</div>';
+}
+
+async function loadPush() {
+  const cases = await API.get('/create/api/workflow-cases');
+  document.getElementById('push-design').textContent =
+    cases.data && cases.data.length
+      ? `社区精选：《${cases.data[0].title}》—— 看看成熟设计师如何拆解一个命题。`
+      : '上传作品积累曝光（500 解锁），你的工作流就能反哺社区教学。';
+}
+
+/* 创作资源导航：五组外链（灵感 / 字体 / 图库 / 图标&logo / 免抠） */
+const RES_GROUPS = [
+  {g: '灵感网站', icon: '💡', items: [
+    {n: '花瓣', u: 'https://huaban.com/'},
+    {n: '站酷', u: 'https://www.zcool.com.cn/'},
+    {n: '享设计', u: 'https://www.design006.com/'},
+    {n: '觅知网', u: 'https://www.51miz.com/'}]},
+  {g: '字体素材', icon: '🔸', items: [
+    {n: 'FonFreak', u: 'https://www.fonfreak.com/'},
+    {n: 'FontSpace', u: 'https://www.fontspace.com/'},
+    {n: '字由', u: 'https://www.hellofont.cn/'},
+    {n: '字魂网', u: 'https://www.zihun.com.cn/'}]},
+  {g: '免费图库', icon: '🔹', items: [
+    {n: 'Unsplash', u: 'https://unsplash.com/'},
+    {n: 'Pexels', u: 'https://www.pexels.com/'},
+    {n: 'SplitShire', u: 'https://www.splitshire.com/'},
+    {n: 'Pixabay', u: 'https://pixabay.com/'}]},
+  {g: '图标 & Logo', icon: '💐', items: [
+    {n: 'iconfont', u: 'https://www.iconfont.cn/'},
+    {n: 'ICONFINDER', u: 'https://www.iconfinder.com/'},
+    {n: '矢量 Logo 下载', u: 'https://worldvectorlogo.com/'},
+    {n: 'Logopond', u: 'https://logopond.com/'}]},
+  {g: '免抠素材', icon: '💎', items: [
+    {n: 'SVG Silh', u: 'https://svgsilh.com/'},
+    {n: 'pngimg', u: 'https://pngimg.com/'},
+    {n: 'Heritage Library', u: 'https://heritagelibrary.art/'}]},
+];
+
+function renderResNav() {
+  document.getElementById('res-nav').innerHTML = RES_GROUPS.map(gr => `
+    <div class="res-group">
+      <h4><span>${gr.icon}</span>${API.esc(gr.g)}</h4>
+      <div class="res-chips">${gr.items.map(it =>
+        `<a class="res-chip" href="${it.u}" target="_blank" rel="noopener">${API.esc(it.n)} ↗</a>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+loadTier(); loadTools(); renderResNav(); loadPortfolio(); loadCases(); loadPush();
+</script>
+{% endblock %}

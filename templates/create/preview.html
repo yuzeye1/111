@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% set platform = 'create' %}
+{% block title %}作品预览 — 帧集 FrameLab{% endblock %}
+{% block main %}
+<div class="wrap">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div>
+      <h1 style="color:var(--c-create-5);font-size:24px">作品预览 · 万向画布</h1>
+      <p class="muted">把作品钉在无限画布上 · 拖动任意漫游 · AI 唤醒随时补给灵感</p>
+    </div>
+    <a class="btn btn-ghost btn-sm" href="/me">个人中心</a>
+  </div>
+
+  <div class="ws-layout">
+    <div class="ws-side">
+      <div class="tool" onclick="newWork()">＋ 新建
+        <small>跳到上传台创建新作品</small></div>
+      <div class="tool" onclick="resetView()">⤢ 万向画布
+        <small>拖动画布漫游 · 点击回正</small></div>
+      <div class="tool" onclick="aiWake()" style="background:linear-gradient(140deg,rgba(167,139,250,.28),rgba(91,140,255,.18));color:var(--text)">
+        ✦ AI 唤醒
+        <small>主题 → 六维灵感方案</small></div>
+      <div class="tool" onclick="location.href='/create/index#portfolio'">参考册 · 作品集
+        <small>风格自动排版</small></div>
+      <div id="ai-box" style="display:none"></div>
+    </div>
+
+    <div>
+      <div class="canvas-board" id="board">
+        <div class="canvas-inner" id="inner"></div>
+      </div>
+      <div class="ws-search">
+        <span class="chip">预览</span>
+        <input id="q" placeholder="搜索作品标题 / 风格，快速定位画布上的作品…">
+      </div>
+      <div class="ws-row" id="thumbs"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let arts = [], vx = 0, vy = 0;
+
+async function loadArts() {
+  const me = await API.ensureLogin();
+  if (!me) {
+    document.getElementById('inner').innerHTML =
+      '<div style="padding:60px;font-size:15px;color:#6a7290">登录后你的作品会钉上画布。<a href="/login" style="color:var(--c-create-3);font-weight:700">去登录 →</a></div>';
+    document.getElementById('thumbs').innerHTML = '';
+    return;
+  }
+  const res = await API.get('/create/api/artworks');
+  if (res.code !== 0) return;
+  arts = res.data.items;
+  renderPins();
+  renderThumbs();
+}
+
+function pinPos(i) {
+  const col = i % 4, row = Math.floor(i / 4);
+  return [60 + col * 240, 40 + row * 260];
+}
+
+function renderPins(kw) {
+  kw = (kw || '').trim().toLowerCase();
+  document.getElementById('inner').innerHTML = arts.map((a, i) => {
+    const [x, y] = pinPos(i);
+    const hit = !kw || a.title.toLowerCase().includes(kw)
+      || (a.style_tag || '').toLowerCase().includes(kw);
+    return `<div class="pin" style="left:${x}px;top:${y}px;${hit ? '' : 'opacity:.18;filter:grayscale(1)'}"
+      onclick="location.href='/create/index#portfolio'">
+      <div class="cv" style="background:${API.coverCss(a.cover)}"></div>
+      <div class="cap"><b>${API.esc(a.title)}</b><br>
+      <span class="muted">${API.esc(a.style_tag || '')} · ${a.created_at || ''}</span></div>
+    </div>`;
+  }).join('') || '<div style="padding:60px;color:#6a7290">画布还空着，点左侧「新建」上传第一件作品。</div>';
+}
+
+function renderThumbs() {
+  document.getElementById('thumbs').innerHTML = arts.slice(0, 8).map(a => `
+    <div class="card" onclick="document.getElementById('q').value='${API.esc(a.title)}';onSearch()">
+      <div class="cover" style="background:${API.coverCss(a.cover)};height:110px;border-radius:16px"></div>
+      <div class="body" style="padding:8px 10px 12px"><h4 style="font-size:13px">${API.esc(a.title)}</h4></div>
+    </div>`).join('') || '<div class="empty" style="grid-column:1/-1">暂无作品</div>';
+}
+
+function onSearch() { renderPins(document.getElementById('q').value); }
+document.getElementById('q').addEventListener('input', onSearch);
+
+/* 万向画布拖拽漫游 */
+const board = document.getElementById('board');
+const inner = document.getElementById('inner');
+let panning = false, sx = 0, sy = 0;
+
+function applyView() { inner.style.transform = `translate(${vx}px, ${vy}px)`; }
+board.addEventListener('mousedown', e => {
+  if (e.target.closest('.pin')) return;
+  panning = true; sx = e.clientX - vx; sy = e.clientY - vy;
+  board.classList.add('dragging');
+});
+window.addEventListener('mousemove', e => {
+  if (!panning) return;
+  vx = e.clientX - sx; vy = e.clientY - sy; applyView();
+});
+window.addEventListener('mouseup', () => { panning = false; board.classList.remove('dragging'); });
+function resetView() { vx = 0; vy = 0; applyView(); }
+
+/* 新建：跳到上传台 */
+function newWork() { location.href = '/create/index#upload'; }
+
+/* AI 唤醒 */
+async function aiWake() {
+  const box = document.getElementById('ai-box');
+  if (box.style.display === 'none') {
+    box.style.display = 'block';
+    box.innerHTML = `
+      <div class="tool" style="text-align:left">
+        <label style="font-size:12px;color:#8890a8">创作主题</label>
+        <input id="ai-theme" placeholder="如：毕业季文创" style="width:100%;margin:6px 0;padding:8px;border-radius:8px;border:1.5px solid var(--border-strong);background:var(--bg-soft);color:var(--text)">
+        <button class="btn btn-sm" style="margin-top:8px" onclick="aiWake()">✦ 唤醒灵感</button>
+      </div>`;
+    return;
+  }
+  const theme = document.getElementById('ai-theme').value.trim();
+  if (!theme) return API.toast('请填写创作主题', false);
+  const res = await API.post('/create/api/inspire',
+    {theme, style: '扁平商业', pain: '风格同质化严重'});
+  if (res.code !== 0) return API.toast(res.msg, false);
+  const d = res.data;
+  box.innerHTML = `
+    <div class="tool" style="text-align:left;font-size:13px;line-height:1.8">
+      <b style="color:var(--c-create-3)">✦ ${API.esc(d.creative)}</b>
+      <p>构图：${API.esc(d.compose)}</p>
+      <p>配色：${API.esc(d.palette.logic)}</p>
+      <div class="swatch-row">${d.palette.swatches.map(s =>
+        `<div class="swatch" style="background:${s};width:26px;height:26px"></div>`).join('')}</div>
+      <p class="muted">剩余免费 ${d.remain_free} 次</p>
+      <p style="background:var(--bg-elev);border-radius:8px;padding:8px;font-size:12px">${API.esc(d.prompt)}</p>
+    </div>`;
+}
+
+loadArts();
+</script>
+{% endblock %}

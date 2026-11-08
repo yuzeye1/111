@@ -1,0 +1,186 @@
+{% extends 'base.html' %}
+{% set platform = 'create' %}
+{% block title %}创作画布 — 帧集 FrameLab{% endblock %}
+{% block main %}
+<div class="wrap">
+  <div class="page-head ph-create" style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
+    <div style="flex:1;min-width:240px">
+      <h1>作品创建 · AI 生成画布</h1>
+      <p>提示词 → 扣 Token 生成 → 存入作品集 · 支持缩放平移与历史回溯</p>
+    </div>
+    <span class="chip" style="background:var(--bg-elev);color:var(--text);font-weight:700" id="token-chip">Token 加载中…</span>
+    <div class="plat-switch" style="margin:0">
+      <a class="chip chip-client" href="/create/index">← 回创作端</a>
+      <a class="chip chip-create" href="/create/shelf">我的书架 →</a>
+    </div>
+  </div>
+
+  <div class="studio-layout">
+    <!-- 左：提示词 / 风格 / 模型 -->
+    <div class="studio-panel">
+      <b style="color:var(--text)">提示词</b>
+      <textarea id="s-prompt" placeholder="描述你想要的画面，如：月白与石青的国潮招贴，书法体点题，0.618 留白…"
+        style="width:100%;min-height:120px;margin-top:10px;padding:12px;border-radius:12px;border:1.5px solid var(--border-strong);background:var(--bg-soft);color:var(--text);box-sizing:border-box"></textarea>
+
+      <b style="color:var(--text);display:block;margin-top:14px">风格选择</b>
+      <select id="s-style" style="width:100%;margin-top:8px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border-strong);background:var(--bg-soft);color:var(--text)">
+        <option>扁平商业</option><option>三维写实</option><option>国潮</option>
+        <option>极简</option><option>酸性</option><option>涂鸦</option><option>像素</option>
+      </select>
+
+      <b style="color:var(--text);display:block;margin-top:14px">模型切换</b>
+      <div class="radio-row" id="model-row" style="margin-top:8px">
+        {% for m in models %}
+        <label><input type="radio" name="model" value="{{ m.id }}" {% if loop.first %}checked{% endif %}> {{ m.name }}</label>
+        {% endfor %}
+      </div>
+      <p class="muted" style="font-size:12px;margin-top:8px">生成一次消耗 3 Token</p>
+    </div>
+
+    <!-- 中：预览画布 -->
+    <div>
+      <div class="studio-canvas" id="canvas">
+        <div id="canvas-inner" style="transition:transform .2s;transform-origin:center">
+          <div id="canvas-empty" style="min-height:420px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:#98a0b8">
+            <img src="/static/img/loading.png" alt="" style="width:64px;opacity:.35">
+            <p>画布空空如也 · 写下提示词，点右上「发起生成」</p>
+          </div>
+          <img id="canvas-img" style="display:none" alt="生成结果">
+        </div>
+        <!-- 生成等待：波纹旋转 -->
+        <div class="gen-wait" id="gen-wait" style="display:none">
+          <img class="loading-spin" src="/static/img/loading.png" alt="生成中" style="width:88px">
+          <b style="color:var(--text)">波纹旋转中 · AI 正在生成…</b>
+          <span class="muted" style="font-size:12.5px">每次生成消耗 3 Token</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:12px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="zoomCanvas(-.2)">－ 缩小</button>
+        <button class="btn btn-ghost btn-sm" onclick="zoomCanvas(.2)">＋ 放大</button>
+        <button class="btn btn-ghost btn-sm" onclick="resetCanvas()">复位</button>
+        <span class="muted" style="font-size:12px;margin-left:8px">拖拽画布平移 · 滚轮也可缩放</span>
+        <div style="margin-left:auto;display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn" id="gen-btn" onclick="doGenerate()">⚡ 消耗 Token 发起生成</button>
+          <button class="btn btn-coin" id="save-btn" onclick="saveToPortfolio()">存入作品集</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右：图层 / 参数 / 历史 -->
+    <div class="studio-panel">
+      <b style="color:var(--text)">生成历史</b>
+      <div id="history" style="margin-top:10px;display:flex;flex-direction:column;gap:10px;max-height:520px;overflow:auto"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let tokens = null, zoom = 1, panX = 0, panY = 0, lastGen = null;
+
+async function loadToken() {
+  const w = await API.get('/api/market/wallet');
+  if (w.code === 0 && w.data.logged_in) {
+    tokens = w.data.tokens;
+    document.getElementById('token-chip').textContent = `金币 ${tokens} Token`;
+  } else {
+    document.getElementById('token-chip').textContent = '登录后可生成';
+  }
+}
+
+async function doGenerate() {
+  const me = await API.ensureLogin();
+  if (!me) return location.href = '/login';
+  const prompt = document.getElementById('s-prompt').value.trim();
+  if (!prompt) return API.toast('请先填写提示词', false);
+  const btn = document.getElementById('gen-btn');
+  btn.disabled = true;
+  document.getElementById('gen-wait').style.display = 'flex';
+  try {
+    const res = await API.post('/create/api/generate', {
+      prompt,
+      style: document.getElementById('s-style').value,
+      model: document.querySelector('input[name=model]:checked').value,
+    });
+    if (res.code !== 0) return API.toast(res.msg, false);
+    API.toast(res.msg);
+    lastGen = res.data.gen;
+    tokens = res.data.tokens;
+    document.getElementById('token-chip').textContent = `金币 ${tokens} Token`;
+    showImage(lastGen.cover);
+    window._lastPlan = res.data.plan;
+    loadHistory();
+  } finally {
+    btn.disabled = false;
+    document.getElementById('gen-wait').style.display = 'none';
+  }
+}
+
+function showImage(src) {
+  document.getElementById('canvas-empty').style.display = 'none';
+  const img = document.getElementById('canvas-img');
+  img.src = src;
+  img.style.display = 'block';
+  resetCanvas();
+}
+
+async function saveToPortfolio() {
+  const me = await API.ensureLogin();
+  if (!me) return location.href = '/login';
+  if (!lastGen) return API.toast('画布上还没有生成结果', false);
+  const res = await API.post('/create/api/artworks', {
+    title: (document.getElementById('s-prompt').value.trim().slice(0, 20) || 'AI 生成作品'),
+    source: 'studio', style_tag: document.getElementById('s-style').value,
+    cover: lastGen.cover, prompt: document.getElementById('s-prompt').value.trim(),
+    model: document.querySelector('input[name=model]:checked').value,
+    tokens_spent: 3,
+  });
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.toast('已存入作品集书架');
+}
+
+async function loadHistory() {
+  const res = await API.get('/create/api/gen-history');
+  if (res.code !== 0) {
+    document.getElementById('history').innerHTML = '<p class="muted">登录后可查看生成历史</p>';
+    return;
+  }
+  document.getElementById('history').innerHTML = res.data.map(h => `
+    <div style="cursor:pointer" onclick="useHistory('${h.id}')" title="${API.esc(h.prompt)}">
+      <img class="gen-thumb" src="${API.esc(h.cover)}" alt="">
+      <div style="font-size:12px;margin-top:4px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${API.esc(h.prompt)}</div>
+      <div class="muted" style="font-size:11px">${API.esc(h.model)} · ${h.tokens} Token</div>
+    </div>`).join('') || '<p class="muted">还没有生成记录</p>';
+  window._genHistory = res.data;
+}
+
+function useHistory(id) {
+  const h = window._genHistory.find(x => x.id === id);
+  if (!h) return;
+  lastGen = h;
+  showImage(h.cover);
+  document.getElementById('s-prompt').value = h.prompt;
+}
+
+/* ---------- 画布缩放平移 ---------- */
+function applyCanvas() {
+  document.getElementById('canvas-inner').style.transform =
+    `translate(${panX}px, ${panY}px) scale(${zoom})`;
+}
+function zoomCanvas(d) { zoom = Math.min(3, Math.max(.4, zoom + d)); applyCanvas(); }
+function resetCanvas() { zoom = 1; panX = 0; panY = 0; applyCanvas(); }
+
+const canvas = document.getElementById('canvas');
+let dragging = false, lastPt = null;
+canvas.addEventListener('mousedown', e => { dragging = true; lastPt = [e.clientX, e.clientY]; });
+window.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  panX += e.clientX - lastPt[0]; panY += e.clientY - lastPt[1];
+  lastPt = [e.clientX, e.clientY]; applyCanvas();
+});
+window.addEventListener('mouseup', () => dragging = false);
+canvas.addEventListener('wheel', e => { e.preventDefault(); zoomCanvas(e.deltaY < 0 ? .12 : -.12); }, {passive: false});
+
+loadToken(); loadHistory();
+</script>
+{% endblock %}

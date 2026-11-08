@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}管理后台 · 帧集 FrameLab{% endblock %}
+{% block main %}
+<section class="admin-dash">
+  <aside class="adm-side glass">
+    <div class="adm-side-title">管理后台</div>
+    <button class="adm-tab active" data-tab="overview">概览</button>
+    <button class="adm-tab" data-tab="users">用户管理</button>
+    <button class="adm-tab" data-tab="artworks">作品管理</button>
+    <button class="adm-tab" data-tab="materials">素材管理</button>
+    <button class="adm-tab" data-tab="orders">订单仲裁</button>
+    <button class="adm-tab" data-tab="feedback">反馈处理</button>
+    <button class="adm-tab" data-tab="announce">公告发布</button>
+    <button class="adm-tab" data-tab="email">邮件通知</button>
+    <a class="adm-side-back" href="/">← 返回主站</a>
+  </aside>
+
+  <div class="adm-main">
+    <!-- 概览 -->
+    <div class="adm-panel active" id="panel-overview">
+      <h2>平台概览</h2>
+      <div class="adm-cards" id="ov-cards"></div>
+    </div>
+
+    <!-- 用户 -->
+    <div class="adm-panel" id="panel-users">
+      <h2>用户管理</h2>
+      <div class="adm-toolbar">
+        <input id="u-kw" placeholder="搜索邮箱 / 昵称">
+        <button class="btn" id="u-search">搜索</button>
+      </div>
+      <div class="adm-table-wrap"><table class="adm-table">
+        <thead><tr><th>ID</th><th>邮箱</th><th>昵称</th><th>身份</th><th>管理员</th>
+          <th>信用分</th><th>Token</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody id="u-body"></tbody>
+      </table></div>
+    </div>
+
+    <!-- 作品 -->
+    <div class="adm-panel" id="panel-artworks">
+      <h2>作品管理</h2>
+      <div class="adm-table-wrap"><table class="adm-table">
+        <thead><tr><th>ID</th><th>标题</th><th>作者</th><th>来源</th>
+          <th>可见性</th><th>日期</th><th>操作</th></tr></thead>
+        <tbody id="a-body"></tbody>
+      </table></div>
+    </div>
+
+    <!-- 素材 -->
+    <div class="adm-panel" id="panel-materials">
+      <h2>素材管理</h2>
+      <div class="adm-table-wrap"><table class="adm-table">
+        <thead><tr><th>ID</th><th>分类</th><th>标题</th><th>艺术家</th>
+          <th>状态</th><th>操作</th></tr></thead>
+        <tbody id="m-body"></tbody>
+      </table></div>
+    </div>
+
+    <!-- 订单 -->
+    <div class="adm-panel" id="panel-orders">
+      <h2>订单仲裁</h2>
+      <div class="adm-toolbar">
+        <select id="o-status">
+          <option value="">全部状态</option>
+          <option value="pending">待接单</option>
+          <option value="accepted">进行中</option>
+          <option value="delivered">已交付</option>
+          <option value="settled">已结算</option>
+          <option value="disputed">仲裁中</option>
+          <option value="cancelled">已取消</option>
+        </select>
+        <button class="btn" id="o-filter">筛选</button>
+      </div>
+      <div class="adm-table-wrap"><table class="adm-table">
+        <thead><tr><th>ID</th><th>标题</th><th>甲方</th><th>接单者</th><th>预算</th>
+          <th>报名</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody id="o-body"></tbody>
+      </table></div>
+    </div>
+
+    <!-- 反馈 -->
+    <div class="adm-panel" id="panel-feedback">
+      <h2>反馈处理</h2>
+      <div class="adm-table-wrap"><table class="adm-table">
+        <thead><tr><th>ID</th><th>用户</th><th>内容</th><th>已发Token</th>
+          <th>日期</th><th>操作</th></tr></thead>
+        <tbody id="f-body"></tbody>
+      </table></div>
+    </div>
+
+    <!-- 公告 -->
+    <div class="adm-panel" id="panel-announce">
+      <h2>公告发布</h2>
+      <div class="adm-form glass">
+        <label>公告标题<input id="an-title" maxlength="120" placeholder="例如：平台维护通知"></label>
+        <label>公告内容<textarea id="an-content" rows="3" maxlength="500"
+          placeholder="将以系统消息下发到用户消息盒子"></textarea></label>
+        <div class="adm-form-row">
+          <label class="adm-radio"><input type="radio" name="an-target" value="all" checked>全体用户</label>
+          <label class="adm-radio"><input type="radio" name="an-target" value="user">指定用户 ID
+            <input id="an-uid" type="number" class="adm-inline-input" placeholder="用户ID"></label>
+        </div>
+        <button class="btn btn-primary" id="an-send">发布公告</button>
+      </div>
+      <h3>历史公告</h3>
+      <div class="adm-table-wrap"><table class="adm-table">
+        <thead><tr><th>ID</th><th>标题</th><th>内容</th><th>时间</th></tr></thead>
+        <tbody id="an-body"></tbody>
+      </table></div>
+    </div>
+
+    <!-- 邮件 -->
+    <div class="adm-panel" id="panel-email">
+      <h2>邮件通知</h2>
+      <div class="adm-form glass">
+        <label>邮件主题<input id="em-subject" maxlength="120" placeholder="例如：帧集平台系统通知"></label>
+        <label>邮件正文<textarea id="em-body" rows="5" placeholder="发送给用户的邮件内容"></textarea></label>
+        <div class="adm-form-row">
+          <label class="adm-radio"><input type="radio" name="em-target" value="all" checked>全体已验证邮箱</label>
+          <label class="adm-radio"><input type="radio" name="em-target" value="user">指定用户 ID
+            <input id="em-uid" type="number" class="adm-inline-input" placeholder="用户ID"></label>
+        </div>
+        <button class="btn btn-primary" id="em-send">发送邮件</button>
+        <p class="adm-hint">发送走 SMTP 通道，失败仅统计不阻断。</p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/admin.js"></script>
+{% endblock %}

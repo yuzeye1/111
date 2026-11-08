@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+{% set platform = 'main' %}
+{% block title %}风格匹配 — 帧集 FrameLab{% endblock %}
+{% block main %}
+<div class="wrap">
+  <div class="wave-band" style="padding:32px 36px">
+    <span class="en-slogan">SMART STYLE MATCHING</span>
+    <div class="wave-lines"></div>
+    <h1 style="font-size:24px">风格智能匹配</h1>
+    <p style="margin-top:8px;opacity:.85;font-size:14px">描述需求 → 系统在设计师库中匹配风格契合的创作者 → 发起定向邀约</p>
+  </div>
+
+  <div class="card" style="padding:24px;margin-top:18px">
+    <div class="grid cols-3">
+      <div class="field" style="grid-column:1/-1">
+        <label>设计需求描述</label>
+        <textarea id="mm-req" rows="3" placeholder="例如：为茶饮品牌做一组国潮包装，需要插画功底，3 个 SKU 差异化"></textarea>
+      </div>
+      <div class="field">
+        <label>偏好风格</label>
+        <select id="mm-style">
+          <option value="">不限</option>
+          <option>国潮</option><option>扁平商业</option><option>插画</option>
+          <option>极简</option><option>酸性</option><option>潮流</option><option>像素</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>预算范围（元）</label>
+        <input id="mm-budget" type="number" value="1000">
+      </div>
+      <div class="field" style="display:flex;align-items:flex-end">
+        <button class="btn" onclick="doMatch()">开始匹配</button>
+        <button class="btn btn-ghost" style="margin-left:10px" onclick="doMatch()">刷新重新计算</button>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="section-title">匹配结果</h2>
+  <div id="match-list"><div class="empty">描述需求后开始匹配</div></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function doMatch() {
+  const requirement = document.getElementById('mm-req').value.trim();
+  if (!requirement) return API.toast('请先描述你的设计需求', false);
+  const res = await API.post('/api/market/match-designers', {
+    requirement,
+    style: document.getElementById('mm-style').value,
+    budget: +document.getElementById('mm-budget').value || 0,
+  });
+  if (res.code !== 0) return API.toast(res.msg, false);
+  const items = res.data.items;
+  document.getElementById('match-list').innerHTML = items.length ? items.map(d => `
+    <div class="order">
+      <div class="match-ring" style="--p:${d.match}%"><i>${d.match}%</i></div>
+      <div style="flex:1">
+        <h4>${API.esc(d.name)} <span class="chip">${levelBadge(d.level)}</span>
+          <span class="chip">${d.credit}信用</span></h4>
+        <p>${API.esc(d.school || '')} ${API.esc(d.major || '')} · 美学均分 ${d.aesthetic} · 已成交 ${d.settled} 单 · ${API.esc(d.schedule)}</p>
+        <p class="muted">擅长：${d.tags.map(API.esc).join(' / ')}</p>
+        <div style="display:flex;gap:10px;margin-top:10px">
+          ${d.works.map(w => `
+            <div class="cover" style="width:76px;height:60px;border-radius:8px;background:${API.coverCss(w.cover)}"
+                 title="${API.esc(w.title)}"></div>`).join('')}
+        </div>
+      </div>
+      <div style="text-align:right">
+        <button class="btn btn-sm" onclick="invite(${d.id}, '${API.esc(d.name).replace(/'/g, '')}')">发起定向邀约</button>
+        <p class="muted" style="margin-top:6px"><a href="/profile/${d.id}" style="color:var(--c-create-3)">查看主页 →</a></p>
+      </div>
+    </div>`).join('') : '<div class="empty">暂无匹配的设计师</div>';
+}
+
+async function invite(id, name) {
+  const note = prompt('邀约说明（会发送到对方消息盒子）：',
+    '希望与你就新项目展开合作，请查看派单大厅详情。');
+  if (note === null) return;
+  const res = await API.post('/api/market/invite', {designer_id: id, note});
+  API.toast(res.msg, res.code === 0);
+}
+</script>
+{% endblock %}

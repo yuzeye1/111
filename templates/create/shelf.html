@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% set platform = 'create' %}
+{% block title %}作品集书架 — 帧集 FrameLab{% endblock %}
+{% block main %}
+<div class="wrap">
+  <div class="page-head ph-create" style="position:relative">
+    <h1>作品集书架</h1>
+    <p>云端作品按你的排序陈列 · 点击卡片查看详情与访问权限</p>
+    <div class="plat-switch">
+      <a class="chip chip-client" href="/create/index">← 回创作端</a>
+      <a class="chip chip-create" href="/create/studio">去创作 →</a>
+    </div>
+    <!-- 右上：一键作品集 / 导出简历 -->
+    <div style="position:absolute;top:24px;right:26px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="genPortfolioLink()">🔗 一键生成作品集</button>
+      <button class="btn btn-coin btn-sm" onclick="exportResume()">📄 一键导出求职简历</button>
+    </div>
+  </div>
+
+  <!-- 排序切换 -->
+  <div class="market-head">
+    <b style="color:var(--text-2);flex:none">排序</b>
+    <div id="sort-tabs" style="display:flex;gap:8px"></div>
+    <span class="muted" id="shelf-count" style="margin-left:auto"></span>
+  </div>
+
+  <div class="grid cols-4" id="shelf-grid"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const SORTS = [
+  {id: 'time', label: '创作时间'},
+  {id: 'style', label: '风格类型'},
+  {id: 'source', label: '项目分类'},
+];
+let curSort = 'time', works = [];
+const SOURCE_NAME = {external: '外部工具', studio: '站内创作', course: '闯关作业',
+                     order: '接单交付', workflow: '工作流'};
+
+function renderSort() {
+  document.getElementById('sort-tabs').innerHTML =
+    SORTS.map(s => `<span class="chip ${s.id === curSort ? 'on' : ''}" onclick="setSort('${s.id}')">${s.label}</span>`).join('');
+}
+function setSort(id) { curSort = id; renderSort(); renderShelf(); }
+
+async function loadShelf() {
+  const me = await API.ensureLogin();
+  if (!me) {
+    document.getElementById('shelf-grid').innerHTML = '<div class="empty">登录后查看你的云端书架</div>';
+    document.getElementById('shelf-count').textContent = '';
+    return;
+  }
+  const res = await API.get('/create/api/artworks');
+  if (res.code !== 0) return;
+  works = res.data.items;
+  window._me = me;
+  renderShelf();
+}
+
+function renderShelf() {
+  let items = [...works];
+  if (curSort === 'time') items.sort((a, b) => b.id - a.id);
+  if (curSort === 'style') items.sort((a, b) => (a.style_tag || '').localeCompare(b.style_tag || '') || b.id - a.id);
+  if (curSort === 'source') items.sort((a, b) => (a.source || '').localeCompare(b.source || '') || b.id - a.id);
+  document.getElementById('shelf-count').textContent = `共 ${items.length} 件作品`;
+  document.getElementById('shelf-grid').innerHTML = items.map(a => `
+    <div class="card" style="cursor:pointer" onclick="location.href='/create/artwork/${a.id}'">
+      <div class="cover" style="background:${API.coverCss(a.cover)}"></div>
+      <div class="body">
+        <h4>${API.esc(a.title)}</h4>
+        <div class="meta">${API.esc(a.style_tag || '未分类')} · ${a.created_at || ''}</div>
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+          <span class="chip" style="font-size:11px;padding:2px 9px;background:rgba(167,139,250,.16);color:var(--acc-create)">${SOURCE_NAME[a.source] || a.source}</span>
+          <span class="chip" style="font-size:11px;padding:2px 9px;background:${(a.visibility || 2) === 2 ? 'rgba(61,220,151,.16);color:var(--ok)' : (a.visibility === 1 ? 'rgba(242,201,76,.16);color:var(--gold)' : 'rgba(255,107,139,.16);color:var(--danger)')}">
+            ${(a.visibility || 2) === 2 ? '公开' : a.visibility === 1 ? '仅甲方' : '私有'}</span>
+        </div>
+      </div>
+    </div>`).join('') || '<div class="empty">书架还是空的，去创作或上传第一件作品吧</div>';
+}
+
+/* 一键生成作品集：在线作品集链接（个人主页） */
+function genPortfolioLink() {
+  const me = window._me;
+  if (!me) return location.href = '/login';
+  const url = location.origin + '/profile/' + me.id;
+  prompt('你的在线作品集链接（可直接发给 HR / 甲方）：', url);
+}
+
+/* 一键导出求职简历：生成适配 HR 的打印版简历 */
+function exportResume() {
+  const me = window._me;
+  if (!me) return location.href = '/login';
+  const rows = works.slice(0, 12).map(a => `
+    <div style="display:flex;gap:14px;margin-bottom:14px;page-break-inside:avoid">
+      <div style="width:86px;height:86px;border-radius:12px;flex:none;background:${API.coverCss(a.cover)}"></div>
+      <div>
+        <b>${API.esc(a.title)}</b>
+        <p style="margin:2px 0;font-size:12px;color:#555">${API.esc(a.style_tag || '')} · ${SOURCE_NAME[a.source] || a.source} · ${a.created_at || ''}</p>
+        ${a.note ? `<p style="margin:2px 0;font-size:12px;color:#666">${API.esc(a.note)}</p>` : ''}
+      </div>
+    </div>`).join('') || '<p>暂无作品</p>';
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>${API.esc(me.name || '设计师')} - 求职简历</title>
+  <style>
+    body { font-family: 'Microsoft YaHei', sans-serif; max-width: 760px; margin: 40px auto; color: #222; line-height: 1.7; }
+    h1 { letter-spacing: 4px; } .tag { display:inline-block; padding:2px 10px; border-radius:999px; background:#eef0fa; color:#6A4DD4; font-size:12px; margin-right:6px; }
+    @media print { .noprint { display:none } }
+  </style></head><body>
+  <h1>${API.esc(me.name || '帧集创作者')}</h1>
+  <p style="color:#666">${API.esc(me.school || '')} ${API.esc(me.major || '')} ${API.esc(me.grade || '')}</p>
+  ${me.verified ? '<p><span class="tag">✓ 平台认证创作者</span></p>' : ''}
+  <h3 style="margin-top:26px">作品集（${works.length} 件精选）</h3>
+  ${rows}
+  <p style="margin-top:20px;color:#999;font-size:12px">简历由 帧集 FrameLab 自动排版生成 · ${new Date().toLocaleDateString('zh-CN')}</p>
+  <button class="noprint" onclick="window.print()" style="padding:10px 22px;border-radius:10px;border:0;background:#6A4DD4;color:#fff;cursor:pointer;margin-top:18px">打印 / 另存为 PDF</button>
+  </body></html>`);
+  w.document.close();
+}
+
+renderSort();
+loadShelf();
+</script>
+{% endblock %}

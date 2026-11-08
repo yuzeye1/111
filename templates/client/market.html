@@ -1,0 +1,210 @@
+{% extends 'base.html' %}
+{% set platform = 'main' %}
+{% block title %}派单大厅 — 帧集 FrameLab{% endblock %}
+{% block main %}
+<div class="wrap">
+  <div class="page-head ph-client">
+    <h1>派单大厅 · 供需对接</h1>
+    <p>保证金托管 · 交易结算绑定 Token 体系</p>
+  </div>
+
+  <div class="market-head">
+    <div class="view-tabs" id="view-tabs">
+      <span class="vt" data-view="designer">设计师视图</span>
+      <span class="vt" data-view="client">甲方视图</span>
+    </div>
+    <input id="f-kw" placeholder="搜索需求标题…" oninput="reloadOrders()">
+    <select id="f-budget" onchange="reloadOrders()">
+      <option value="">预算不限</option>
+      <option value="500">¥500 以下</option>
+      <option value="2000">¥2000 以下</option>
+      <option value="5000">¥5000 以下</option>
+    </select>
+    <input id="f-tag" placeholder="风格标签，如 国潮" oninput="reloadOrders()">
+    <select id="f-days" onchange="reloadOrders()">
+      <option value="">工期不限</option>
+      <option value="5">5 天内</option>
+      <option value="10">10 天内</option>
+      <option value="15">15 天内</option>
+    </select>
+    <span class="muted" id="order-count"></span>
+  </div>
+
+  <div id="client-panel" style="display:none" class="card"></div>
+  <div id="orders"></div>
+  <p class="muted" style="text-align:center;padding:16px" id="load-more-hint"></p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let curView = 'designer', shown = 6;
+
+function setView(v) {
+  curView = v; shown = 6;
+  document.querySelectorAll('#view-tabs .vt').forEach(t =>
+    t.classList.toggle('on', t.dataset.view === v));
+  document.getElementById('client-panel').style.display =
+    v === 'client' ? 'block' : 'none';
+  reloadOrders();
+  if (v === 'client') loadClientPanel();
+}
+
+document.querySelectorAll('#view-tabs .vt').forEach(t =>
+  t.addEventListener('click', () => setView(t.dataset.view)));
+
+async function reloadOrders() {
+  const budget = document.getElementById('f-budget').value;
+  const tag = document.getElementById('f-tag').value.trim();
+  const days = document.getElementById('f-days').value;
+  const params = new URLSearchParams({kw: document.getElementById('f-kw').value.trim()});
+  if (days) params.set('max_days', days);
+  if (tag) params.set('tag', tag);
+  const res = await API.get('/api/market/orders?' + params);
+  if (res.code !== 0) return;
+  let all = res.data;
+  if (budget) all = all.filter(o => o.budget <= +budget);
+  renderOrders(all);
+}
+
+let curOrders = [];
+function renderOrders(list) {
+  curOrders = list;
+  document.getElementById('order-count').textContent = `共 ${list.length} 个悬赏`;
+  const slice = list.slice(0, shown);
+  document.getElementById('orders').innerHTML = slice.map(o => `
+    <div class="order">
+      <div class="match-ring" style="--p:${o.match || 0}%"><i>${o.match || 0}%</i></div>
+      <div style="flex:1">
+        <h4>${API.esc(o.title)}</h4>
+        <p>${API.esc(o.requirement || '')}</p>
+        <p class="muted">类型：${API.esc(o.type)} · 工期 ${o.days} 天 · 标签：${(o.tags || []).map(API.esc).join(' / ')} · ${API.esc(o.company)}</p>
+      </div>
+      <div style="text-align:right">
+        <div class="budget">¥${o.budget}</div>
+        <div class="muted">保证金 ¥${o.deposit} 已托管</div>
+        <button class="btn btn-sm" style="margin-top:8px" onclick="applyOrder(${o.id})">报名接单</button>
+      </div>
+    </div>`).join('') || '<div class="empty">没有符合条件的悬赏</div>';
+  document.getElementById('load-more-hint').textContent =
+    shown < list.length ? '↓ 滚动到底自动加载更多' : '';
+}
+
+window.addEventListener('scroll', () => {
+  if (shown >= curOrders.length) return;
+  if (innerHeight + scrollY > document.body.scrollHeight - 200) {
+    shown += 6; renderOrders(curOrders);
+  }
+});
+
+async function applyOrder(id) {
+  const note = prompt('报名方案说明（会发送给甲方）：',
+                      '我擅长该风格，可在工期内交付高质量成稿。');
+  if (note === null) return;
+  const res = await API.post(`/api/market/orders/${id}/apply`, {note});
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.toast(res.msg);
+  reloadOrders();
+}
+
+/* 甲方视图：发布新需求 + 管理已接订单 */
+async function loadClientPanel() {
+  const box = document.getElementById('client-panel');
+  box.innerHTML = `
+    <p style="margin-bottom:14px">发布新需求（自动托管 20% 保证金，最低 50 元）</p>
+    <div class="grid cols-4">
+      <div class="field"><label>需求标题</label><input id="m-o-title" placeholder="需求标题"></div>
+      <div class="field"><label>类型</label>
+        <select id="m-o-type"><option>海报</option><option>文创</option><option>IP</option><option>包装</option><option>新媒体</option></select></div>
+      <div class="field"><label>预算（元）</label><input id="m-o-budget" type="number" value="800"></div>
+      <div class="field"><label>工期（天）</label><input id="m-o-days" type="number" value="7"></div>
+    </div>
+    <div class="field"><label>需求说明</label><input id="m-o-req" placeholder="一句话说明需求与风格要求"></div>
+    <div class="field"><label>风格标签（逗号分隔）</label><input id="m-o-tags" placeholder="国潮, 文创"></div>
+    <button class="btn" onclick="publishHere()">发布需求</button>
+    <div id="client-orders" style="margin-top:22px"></div>`;
+  const c = (await API.get('/api/market/client/me')).data;
+  const mineEl = () => document.getElementById('client-orders');
+  if (!c) {
+    mineEl().innerHTML = '<p class="muted">先完成甲方认证才能发布 → <a href="/client/index" style="color:var(--c-create-3)">去接单端主页认证</a></p>';
+    return;
+  }
+  await renderClientOrders();
+}
+
+async function renderClientOrders() {
+  const mine = await API.get('/api/market/my-orders?role=client');
+  document.getElementById('client-orders').innerHTML = mine.data.items.map(o => `
+    <div class="order">
+      <div style="flex:1">
+        <h4>${API.esc(o.title)}</h4>
+        <p class="muted">¥${o.budget} · ${({pending:'待接单',accepted:'进行中',delivered:'已交付',reviewed:'已验收',settled:'已结算'})[o.status] || o.status}</p>
+      </div>
+      <div>
+        ${o.status === 'pending' ? `<button class="btn btn-sm" onclick="toggleApps(${o.id})">查看报名</button>` : ''}
+        ${o.status === 'delivered' ? `
+          <input id="mr-${o.id}" type="number" min="1" max="5" value="5" style="width:44px;padding:6px"> 星
+          <button class="btn btn-sm" onclick="reviewHere(${o.id})">验收评价</button>` : ''}
+        ${o.status === 'reviewed' ? `<button class="btn btn-sm" onclick="settleHere(${o.id})">确认结算</button>` : ''}
+      </div>
+    </div>
+    <div id="apps-${o.id}" class="apps-box"></div>`).join('') || '<p class="muted">还没有发布过需求</p>';
+}
+
+async function toggleApps(id) {
+  const box = document.getElementById('apps-' + id);
+  if (box.dataset.open === '1') { box.dataset.open = '0'; box.innerHTML = ''; return; }
+  box.dataset.open = '1';
+  const res = await API.get(`/api/market/orders/${id}/applications`);
+  if (res.code !== 0) return API.toast(res.msg, false);
+  box.innerHTML = res.data.items.map(a => `
+    <div class="order" style="margin-top:8px;padding:12px">
+      <div style="flex:1">
+        <b>${API.esc(a.user_name)}</b>
+        <span class="chip" style="margin-left:8px">${({pending:'待筛选',accepted:'已选定',rejected:'未通过'})[a.status] || a.status}</span>
+        <p class="muted" style="margin-top:6px">${API.esc(a.note || '（无方案说明）')}</p>
+      </div>
+      ${a.status === 'pending' ? `<button class="btn btn-sm" onclick="selectApp(${id},${a.id})">选定</button>` : ''}
+    </div>`).join('') || '<p class="muted" style="margin-top:8px">暂无报名</p>';
+}
+
+async function selectApp(oid, appId) {
+  const res = await API.post(`/api/market/orders/${oid}/select/${appId}`);
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.toast(res.msg);
+  renderClientOrders(); reloadOrders();
+}
+
+async function publishHere() {
+  const res = await API.post('/api/market/orders', {
+    title: document.getElementById('m-o-title').value.trim(),
+    type: document.getElementById('m-o-type').value,
+    budget: +document.getElementById('m-o-budget').value,
+    days: +document.getElementById('m-o-days').value,
+    requirement: document.getElementById('m-o-req').value.trim(),
+    tags: document.getElementById('m-o-tags').value.split(/[,，]/).map(s => s.trim()).filter(Boolean),
+  });
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.toast(res.msg);
+  renderClientOrders(); reloadOrders();
+}
+
+async function reviewHere(id) {
+  const rating = Math.max(1, Math.min(5, +document.getElementById('mr-' + id).value || 5));
+  const res = await API.post(`/api/market/orders/${id}/review`, {rating});
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.toast(res.msg); renderClientOrders();
+}
+
+async function settleHere(id) {
+  const res = await API.post(`/api/market/orders/${id}/settle`);
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.toast(res.msg); renderClientOrders();
+}
+
+(async () => {
+  const me = await API.ensureLogin();
+  if (me && me.role === 'client') setView('client');
+  else setView('designer');
+})();
+</script>
+{% endblock %}

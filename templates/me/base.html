@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block title %}个人中心 — 帧集 FrameLab{% endblock %}
+{% block main %}
+<div class="wrap">
+  <div class="me-layout">
+    <aside class="me-side">
+      <div class="head">
+        <div class="avatar" id="me-avatar">帧</div>
+        <b id="me-name">同学</b>
+        <p class="muted" id="me-sub">登录后同步你的档案</p>
+        <p style="margin-top:8px"><span class="coin" id="me-coin">0 Token</span></p>
+      </div>
+      <nav class="me-menu">
+        <a href="/me" class="{% if me_nav == 'home' %}on{% endif %}">◎ 个人中心 · 使用分析</a>
+        <a href="/me#trace" class="{% if me_nav == 'trace' %}on{% endif %}">🌱 帧集印迹</a>
+        <a href="/me/recharge" class="{% if me_nav == 'recharge' %}on{% endif %}">🪙 充值 / 升级</a>
+        <a href="/me/favorites" class="{% if me_nav == 'favorites' %}on{% endif %}">⭐ 收藏作品 / 赞</a>
+        <a href="/me/settings" class="{% if me_nav == 'settings' %}on{% endif %}">⚙ 设置通用</a>
+      </nav>
+      <a class="btn btn-ghost btn-sm" style="display:block;text-align:center;margin-top:14px" href="/index">回主页</a>
+    </aside>
+    <div>{% block me_content %}{% endblock %}</div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(async () => {
+  const me = await API.get('/api/auth/me');
+  if (me.code === 0 && me.data && (me.data.user || me.data).id) {
+    const u = me.data.user || me.data;
+    document.getElementById('me-avatar').textContent = (u.name || '帧').slice(0, 1);
+    document.getElementById('me-name').textContent = u.name || '同学';
+    document.getElementById('me-sub').textContent =
+      `${levelBadge(me.data.level || 1)} · ${u.tier_name || '免费版'} · ${u.credit_score}信用`;
+    document.getElementById('me-coin').textContent = (u.tokens || 0) + ' Token';
+  }
+})();
+
+window.refreshMeCoin = async () => {
+  const me = await API.get('/api/auth/me');
+  if (me.code === 0 && me.data && (me.data.user || me.data).id) {
+    const u = me.data.user || me.data;
+    document.getElementById('me-coin').textContent = (u.tokens || 0) + ' Token';
+    const nav = document.getElementById('nav-token');
+    if (nav) nav.textContent = (u.tokens || 0) + ' Token';
+  }
+};
+</script>
+{% block me_scripts %}{% endblock %}
+{% endblock %}

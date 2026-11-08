@@ -1,0 +1,212 @@
+{% extends 'base.html' %}
+{% set platform = 'main' %}
+{% block title %}接单端 — 帧集 FrameLab{% endblock %}
+{% block main %}
+<div class="wrap">
+  <div class="wave-band">
+    <span class="en-slogan">WHERE EVERY FRAME SHINES</span>
+    <div class="wave-lines"></div>
+    <h1 style="font-size:27px;letter-spacing:2px">接单端 · 商业供需核心</h1>
+    <p style="margin-top:10px;opacity:.85;font-size:14px">作品展示 · 派单变现 · 风格匹配 · 实习通道 —— 把每一件作品变成第一笔稿费</p>
+    <div class="plat-switch">
+      <a class="btn btn-coin" href="/me/recharge">金币 Token 余额</a>
+      <a class="btn btn-ghost btn-sm" href="/client/match">风格智能匹配</a>
+      <button class="btn btn-ghost btn-sm" onclick="switchRole()">身份反转</button>
+    </div>
+  </div>
+
+  <h2 class="section-title">六大功能</h2>
+  <div class="wave-cards" id="modules"></div>
+
+  <h2 class="section-title">作品广场</h2>
+  <div class="grid cols-4" id="showcase"></div>
+
+  <h2 class="section-title" id="orders-anchor">我的接单 / 需求管理</h2>
+  <div class="card" style="padding:20px" id="taker-box"></div>
+  <div class="card" style="padding:24px;margin-top:14px" id="client-box"></div>
+
+  <h2 class="section-title">实习通道</h2>
+  <div class="grid cols-3" id="internships"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const MODULES = [
+  {icon: '📄', name: '工作简历', desc: '维护求职简历与能力档案', go: () => location.href = '/me#resume'},
+  {icon: '🧰', name: '模板使用 / 上传', desc: '跳转专业工具创作后上传成稿', go: () => location.href = '/create/index#upload'},
+  {icon: '📋', name: '接单派单大厅', desc: '浏览悬赏、匹配度排序、报名接单', go: () => location.href = '/client/market'},
+  {icon: '📚', name: '曝光优集', desc: '帧集优集书架，素材对标学习', go: () => location.href = '/edu/shelf'},
+  {icon: '🎁', name: '天降 Offer', desc: '实习通道，能力档案一键投递', go: () => document.getElementById('internships').scrollIntoView({behavior: 'smooth'})},
+  {icon: '💼', name: '商业作品集', desc: '查看设计师作品与公开主页', go: () => document.getElementById('showcase').scrollIntoView({behavior: 'smooth'})},
+];
+
+function loadModules() {
+  document.getElementById('modules').innerHTML = MODULES.map((m, i) => `
+    <div class="wave-card" onclick="MODclick(${i})">
+      <div class="wc-icon">${m.icon}</div>
+      <div style="flex:1"><b>${m.name}</b><p>${m.desc}</p></div>
+      <span class="wc-go">→</span>
+    </div>`).join('');
+}
+
+function MODclick(i) { MODULES[i].go(); }
+
+async function loadShowcase() {
+  const res = await API.get('/api/market/showcase');
+  if (res.code !== 0) return;
+  document.getElementById('showcase').innerHTML = res.data.map(a => `
+    <div class="card" onclick="location.href='/profile/${a.author_id}'">
+      <div class="cover" style="background:${API.coverCss(a.cover)}"></div>
+      <div class="body"><h4>${API.esc(a.title)}</h4>
+      <div class="meta">${API.esc(a.author)} · ${API.esc(a.style_tag || '')}</div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:8px"
+        onclick="event.stopPropagation();likeArt(${a.id}, this)">${a.liked ? '♥' : '♡'} ${a.likes}</button></div>
+    </div>`).join('') || '<div class="empty">暂无作品</div>';
+}
+
+async function likeArt(id, btn) {
+  const res = await API.post(`/api/market/artworks/${id}/like`);
+  if (res.code !== 0) return API.toast(res.msg, false);
+  btn.textContent = (res.data.liked ? '♥ ' : '♡ ') + res.data.likes;
+}
+
+async function switchRole() {
+  const res = await API.post('/api/market/switch-role');
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.toast(res.msg);
+  loadTakerBox(); loadClientBox();
+}
+
+async function loadTakerBox() {
+  const box = document.getElementById('taker-box');
+  const me = await API.ensureLogin();
+  if (!me) { box.innerHTML = '<p class="muted">登录后可在这里查看在途订单并交付成品。</p>'; return; }
+  const res = await API.get('/api/market/my-orders?role=taker');
+  if (res.code !== 0) return;
+  box.innerHTML = res.data.items.map(o => `
+    <div class="order" style="margin-bottom:12px">
+      <div style="flex:1">
+        <h4>${API.esc(o.title)} <span class="chip">${({pending:'待接',accepted:'进行中',delivered:'已交付',reviewed:'已验收',settled:'已结算'})[o.status] || o.status}</span></h4>
+        <p class="muted">¥${o.budget} · 工期 ${o.days} 天 · 发布于 ${o.created_at}</p>
+        <p style="font-size:13px;margin-top:6px">${API.esc(o.requirement || '')}</p>
+      </div>
+      <div>
+        ${o.status === 'accepted' ? `
+          <input id="dl-title-${o.id}" placeholder="成品标题" style="padding:8px 12px;border-radius:8px;border:1.5px solid var(--border-strong);background:var(--bg-soft);color:var(--text);margin-bottom:8px">
+          <button class="btn btn-sm" onclick="deliverOrder(${o.id})">上传交付</button>` : ''}
+        ${o.status === 'delivered' ? '<p class="muted">等待甲方验收</p>' : ''}
+        ${o.status === 'settled' ? '<p style="color:var(--ok);font-size:13px">✓ 已结算入账</p>' : ''}
+      </div>
+    </div>`).join('') || '<p class="muted">还没有接单记录，去派单大厅看看匹配度 → <a href="/client/market" style="color:var(--c-create-3)">前往大厅</a></p>';
+}
+
+async function deliverOrder(id) {
+  const title = document.getElementById('dl-title-' + id).value.trim() || '订单交付稿';
+  const res = await API.post(`/api/market/orders/${id}/deliver`, {title});
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.toast(res.msg);
+  loadTakerBox();
+}
+
+async function loadClientBox() {
+  const box = document.getElementById('client-box');
+  const me = await API.ensureLogin();
+  if (!me) { box.innerHTML = '<p class="muted">登录后可完成甲方认证并发布需求。</p>'; return; }
+  const c = (await API.get('/api/market/client/me')).data;
+  if (!c) {
+    box.innerHTML = `
+      <p style="margin-bottom:14px">完成企业/社团认证后即可发布设计需求（需托管 20% 保证金，最低 50 元）</p>
+      <div class="grid cols-3">
+        <div class="field"><label>类型</label>
+          <select id="c-kind"><option value="company">企业</option><option value="club">社团</option></select></div>
+        <div class="field"><label>名称</label><input id="c-company" placeholder="企业或社团名称"></div>
+        <div class="field" style="display:flex;align-items:flex-end">
+          <button class="btn" onclick="verifyClient()">提交认证</button></div>
+      </div>`;
+    return;
+  }
+  const mine = await API.get('/api/market/my-orders?role=client');
+  box.innerHTML = `
+    <p style="margin-bottom:14px">✓ 已认证：${API.esc(c.company)}（${c.kind === 'club' ? '社团' : '企业'}）· 发布新需求</p>
+    <div class="grid cols-4">
+      <div class="field"><label>需求标题</label><input id="o-title" placeholder="如：毕业季文创包装设计"></div>
+      <div class="field"><label>类型</label>
+        <select id="o-type"><option>海报</option><option>文创</option><option>IP</option><option>包装</option><option>新媒体</option></select></div>
+      <div class="field"><label>预算（元）</label><input id="o-budget" type="number" value="800"></div>
+      <div class="field"><label>工期（天）</label><input id="o-days" type="number" value="7"></div>
+    </div>
+    <div class="field"><label>需求说明</label><input id="o-req" placeholder="一句话说明需求与风格要求"></div>
+    <div class="field"><label>风格标签（逗号分隔）</label><input id="o-tags" placeholder="国潮, 文创"></div>
+    <button class="btn" onclick="publish()">发布需求（自动托管 20% 保证金）</button>
+    <div id="my-orders" style="margin-top:22px">${
+      mine.data.items.map(o => `
+        <div class="order">
+          <div style="flex:1">
+            <h4>${API.esc(o.title)}</h4>
+            <p class="muted">¥${o.budget} · ${({pending:'待接单',accepted:'进行中',delivered:'已交付',reviewed:'已验收',settled:'已结算'})[o.status] || o.status}</p>
+          </div>
+          <div>
+            ${o.status === 'delivered' ? `
+              <input id="rate-${o.id}" type="number" min="1" max="5" value="5" style="width:44px;padding:6px"> 星
+              <button class="btn btn-sm" onclick="review(${o.id})">验收评价</button>` : ''}
+            ${o.status === 'reviewed' ? `<button class="btn btn-sm" onclick="settle(${o.id})">确认结算</button>` : ''}
+          </div>
+        </div>`).join('') || '<p class="muted">还没有发布过需求</p>'
+    }</div>`;
+}
+
+async function verifyClient() {
+  const res = await API.post('/api/market/client/verify', {
+    kind: document.getElementById('c-kind').value,
+    company: document.getElementById('c-company').value.trim(),
+  });
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.toast(res.msg); loadClientBox();
+}
+
+async function publish() {
+  const res = await API.post('/api/market/orders', {
+    title: document.getElementById('o-title').value.trim(),
+    type: document.getElementById('o-type').value,
+    budget: +document.getElementById('o-budget').value,
+    days: +document.getElementById('o-days').value,
+    requirement: document.getElementById('o-req').value.trim(),
+    tags: document.getElementById('o-tags').value.split(/[,，]/).map(s => s.trim()).filter(Boolean),
+  });
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.toast(res.msg); loadClientBox();
+}
+
+async function review(id) {
+  const rating = Math.max(1, Math.min(5, +document.getElementById('rate-' + id).value || 5));
+  const res = await API.post(`/api/market/orders/${id}/review`, {rating});
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.toast(res.msg); loadClientBox();
+}
+
+async function settle(id) {
+  const res = await API.post(`/api/market/orders/${id}/settle`);
+  if (res.code !== 0) return API.toast(res.msg, false);
+  API.toast(res.msg); loadClientBox();
+}
+
+async function loadInternships() {
+  const res = await API.get('/api/market/internships');
+  if (res.code !== 0) return;
+  document.getElementById('internships').innerHTML = res.data.map(i => `
+    <div class="card" style="padding:20px">
+      <b>${API.esc(i.title)}</b>
+      <p class="muted" style="margin:6px 0">${API.esc(i.company)} · ${API.esc(i.pay)}</p>
+      <p class="muted">要求：${levelBadge(i.need_level)} 起${i.remote ? ' · 可远程' : ''}</p>
+      <button class="btn btn-sm" style="margin-top:10px" onclick="applyJob(${i.id})">投递（附能力档案）</button>
+    </div>`).join('') || '<div class="empty">暂无实习岗位</div>';
+}
+
+async function applyJob(id) {
+  const res = await API.post(`/api/market/internships/${id}/apply`);
+  API.toast(res.msg, res.code === 0);
+}
+
+loadModules(); loadShowcase(); loadTakerBox(); loadClientBox(); loadInternships();
+</script>
+{% endblock %}
