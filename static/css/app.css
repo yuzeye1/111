@@ -3,39 +3,43 @@
    深色底 + 玻璃拟态卡片 + 柔和发光，正文对比度 ≥ AA。 */
 
 :root {
-  /* 基础表面 */
-  --bg: #080a12;
-  --bg-soft: #0d101b;
-  --bg-card: #141826;
-  --bg-elev: #1b2032;
-  --border: rgba(255,255,255,.08);
-  --border-strong: rgba(255,255,255,.16);
+  /* 基础表面（森林极光：深紫黑底） */
+  --bg: #0a0810;
+  --bg-soft: #100c18;
+  --bg-card: #120e1c;
+  --bg-elev: #1a1526;
+  --border: rgba(255,255,255,.09);
+  --border-strong: rgba(255,255,255,.22);
   /* 文字 */
-  --text: #e9ebf4;
-  --text-2: #c2c7da;
-  --muted: #9098b0;
-  --dim: #6b7288;
-  /* 强调色 */
-  --acc-client: #5b8cff;
-  --acc-edu: #4fd6b4;
-  --acc-create: #a78bfa;
+  --text: #f5f2fa;
+  --text-2: #c9c2d6;
+  --muted: #9b93a8;
+  --dim: #6f6680;
+  /* 强调色（三端 = 冰蓝 / 苔绿 / 紫罗兰） */
+  --acc-client: #afeeff;
+  --acc-edu: #8fd694;
+  --acc-create: #c478db;
+  --violet-deep: #8040c1;
+  --lilac: #998ad7;
   --gold: #f2c94c;
   --danger: #ff6b8b;
-  --ok: #3ddc97;
+  --ok: #8fd694;
 
   /* 兼容旧模板内联引用的色板变量（重映射为暗色主题值） */
-  --c-client-1: #1a2340; --c-client-2: #241d40; --c-client-3: #56d3d8;
-  --c-client-4: #5b8cff; --c-client-5: #eef1ff;
-  --c-edu-1: #12281f; --c-edu-2: #10262b; --c-edu-3: #4fd6b4;
-  --c-edu-4: #3aa79a; --c-edu-5: #8b9bff;
-  --c-create-1: #1b1836; --c-create-2: #6d5bd0; --c-create-3: #a78bfa;
-  --c-create-4: #b06ad4; --c-create-5: #cbd2ff;
+  --c-client-1: #101a24; --c-client-2: #1b1830; --c-client-3: #afeeff;
+  --c-client-4: #7db8ff; --c-client-5: #eef1ff;
+  --c-edu-1: #12241c; --c-edu-2: #10221f; --c-edu-3: #8fd694;
+  --c-edu-4: #5fb886; --c-edu-5: #998ad7;
+  --c-create-1: #1b1836; --c-create-2: #8040c1; --c-create-3: #c478db;
+  --c-create-4: #998ad7; --c-create-5: #cbd2ff;
 
   --font: "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
   /* 展示字体：Bahnschrift（Win10+ 内置 DIN 冷凝体）打底，科技海报感 */
   --font-disp: "Bahnschrift", "DIN Alternate", "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
   /* 数字字体：价格 / 统计 / Token 等表格式数字 */
   --font-num: "Bahnschrift", "DIN Alternate", "Rajdhani", "Consolas", sans-serif;
+  /* 等宽点缀：编号 / 标签 / 页脚信息 */
+  --font-mono: "Space Mono", "JetBrains Mono", Consolas, monospace;
   --shadow: 0 12px 34px rgba(0,0,0,.42);
   --glow: 0 0 0 1px rgba(255,255,255,.04), 0 10px 30px rgba(0,0,0,.35);
 }
@@ -64,7 +68,7 @@ a { color: inherit; text-decoration: none; }
   position: sticky; top: 0; z-index: 50;
   display: flex; align-items: center; gap: 26px;
   padding: 14px 6vw;
-  background: rgba(10,12,20,.72);
+  background: rgba(10,8,16,.72);
   backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border);
 }
@@ -119,8 +123,8 @@ a { color: inherit; text-decoration: none; }
 }
 .hero h1 {
   position: relative; z-index: 2;
-  font-size: clamp(34px, 5vw, 56px); letter-spacing: 4px;
-  color: #fff; text-shadow: 0 6px 30px rgba(91,140,255,.35);
+  font-size: clamp(36px, 5.5vw, 68px); font-weight: 900; letter-spacing: -0.01em;
+  color: #fff; text-shadow: 0 0 60px rgba(10,8,16,.6);
 }
 .hero p.sub { position: relative; z-index: 2; margin-top: 14px; color: var(--text-2); font-size: 17px; letter-spacing: 2px; }
 
@@ -197,10 +201,11 @@ a { color: inherit; text-decoration: none; }
 @media (max-width: 860px) { .cols-4, .cols-3, .cols-2, .portals { grid-template-columns: 1fr; } }
 
 .card {
-  background: var(--bg-card); border-radius: 16px; overflow: hidden;
-  border: 1px solid var(--border); transition: transform .2s, box-shadow .2s, border-color .2s;
+  background: rgba(16,12,24,.82); border-radius: 20px; overflow: hidden;
+  border: 1px solid var(--border); backdrop-filter: blur(8px);
+  transition: transform .45s cubic-bezier(.2,.8,.2,1), box-shadow .45s, border-color .45s;
 }
-.card:hover { transform: translateY(-4px); box-shadow: var(--shadow); border-color: var(--border-strong); }
+.card:hover { transform: translateY(-6px); box-shadow: var(--shadow); border-color: var(--border-strong); }
 .card .cover { height: 150px; background: linear-gradient(135deg, #232a44, #1a2b34); }
 .card .body { padding: 14px 16px 18px; }
 .card .body h4 { font-size: 15px; line-height: 1.5; color: var(--text); }
@@ -619,9 +624,19 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px;
 
 /* ---------- 全局极光背景 ---------- */
 .global-aurora { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; background: var(--bg); }
-.global-aurora::before, .global-aurora::after { content: ''; position: absolute; width: 55vw; height: 55vw; border-radius: 50%; filter: blur(100px); opacity: .22; }
-.global-aurora::before { left: -18vw; top: -22vw; background: radial-gradient(closest-side, #7848d6, #3a5cff 60%, transparent); animation: aurora-drift 18s ease-in-out infinite alternate; opacity: .26; }
-.global-aurora::after { right: -20vw; bottom: -24vw; background: radial-gradient(closest-side, #b03ad4, #7848d6 55%, transparent); animation: aurora-drift 22s ease-in-out infinite alternate-reverse; opacity: .22; }
+.global-aurora::before {
+  content: ''; position: absolute; inset: 0;
+  background:
+    radial-gradient(90% 60% at 50% -5%, rgba(128,64,193,.55), transparent 60%),
+    radial-gradient(70% 50% at 80% 20%, rgba(196,120,219,.28), transparent 65%),
+    radial-gradient(80% 55% at 15% 25%, rgba(73,111,133,.25), transparent 60%),
+    radial-gradient(100% 60% at 50% 108%, rgba(32,61,39,.8), transparent 70%);
+  animation: sky-breathe 14s ease-in-out infinite alternate;
+}
+@keyframes sky-breathe {
+  0% { opacity: .85; transform: scale(1); }
+  100% { opacity: 1; transform: scale(1.06); }
+}
 @keyframes aurora-drift { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(6vw, 4vw) scale(1.12); } }
 
 /* ---------- 水墨噪点 + 发光线条 ---------- */
@@ -1144,3 +1159,36 @@ h2, h3, .section-title { letter-spacing: 2px; }
 }
 /* 全息字下的旧 text-shadow 会透出矩形光斑，清除 */
 .holo, .holo * { text-shadow: none !important; }
+
+/* ---------- 森林极光：噪点颗粒 + 自定义光标（对齐参考原型） ---------- */
+.grain {
+  position: fixed; inset: -100px; z-index: 150; pointer-events: none;
+  opacity: .06;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: grain-shift .5s steps(4) infinite;
+}
+@keyframes grain-shift {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-40px, 30px); }
+  50% { transform: translate(30px, -45px); }
+  75% { transform: translate(-25px, -20px); }
+  100% { transform: translate(0, 0); }
+}
+
+.cursor-dot, .cursor-ring {
+  position: fixed; top: 0; left: 0; z-index: 300;
+  pointer-events: none; border-radius: 50%;
+  mix-blend-mode: difference; display: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .cursor-dot, .cursor-ring { display: block; }
+}
+.cursor-dot { width: 8px; height: 8px; background: #fff; transform: translate(-50%,-50%); }
+.cursor-ring {
+  width: 40px; height: 40px; border: 1px solid #fff;
+  transform: translate(-50%,-50%);
+  transition: width .3s, height .3s, opacity .3s;
+}
+.cursor-ring.is-hover { width: 72px; height: 72px; opacity: .6; }
+
+.mono { font-family: var(--font-mono); }

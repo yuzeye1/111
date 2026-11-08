@@ -57,7 +57,7 @@ app.register_blueprint(admin_bp)
 
 
 # 静态资源版本号：CSS/JS 有更新时改这里，模板引用会带 ?v= 强制浏览器重新下载
-STATIC_VER = '20261108'
+STATIC_VER = '20261108-2'
 
 
 @app.context_processor

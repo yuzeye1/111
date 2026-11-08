@@ -8,6 +8,9 @@
   <link rel="stylesheet" href="/static/css/app.css?v={{ static_v }}">
 </head>
 <body>
+<div class="grain"></div>
+<div class="cursor-dot"></div>
+<div class="cursor-ring"></div>
 <section class="splash" id="splash">
   <!-- 黑紫星云动态背景 -->
   <div class="sp-nebula"></div>
@@ -85,5 +88,6 @@ document.getElementById('today').addEventListener('blur', e => {
   localStorage.setItem('framelab_splash_date', e.target.textContent.trim());
 });
 </script>
+<script src="/static/js/fx.js?v={{ static_v }}"></script>
 </body>
 </html>

@@ -154,3 +154,25 @@
     }
   });
 })();
+
+/* 自定义光标（森林极光原型同款）：白点即时跟随 + 描边圆环阻尼跟随 */
+(function () {
+  if (!window.matchMedia || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+  var dot = document.querySelector('.cursor-dot');
+  var ring = document.querySelector('.cursor-ring');
+  if (!dot || !ring) return;
+  var x = window.innerWidth / 2, y = window.innerHeight / 2, rx = x, ry = y;
+  document.addEventListener('mousemove', function (e) {
+    x = e.clientX; y = e.clientY;
+    dot.style.left = x + 'px'; dot.style.top = y + 'px';
+  });
+  (function loop() {
+    rx += (x - rx) * 0.18; ry += (y - ry) * 0.18;
+    ring.style.left = rx + 'px'; ring.style.top = ry + 'px';
+    requestAnimationFrame(loop);
+  })();
+  document.addEventListener('mouseover', function (e) {
+    var interactive = e.target.closest && e.target.closest('a,button,input,select,textarea,[role="button"]');
+    ring.classList.toggle('is-hover', !!interactive);
+  });
+})();
