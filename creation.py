@@ -303,6 +303,51 @@ def gallery_materials():
 
 # ---------- 作品创建：AI 生成（新需求文档） ----------
 
+# 各风格的专业画质描述词（用于文生图提示词，替换原先写死的“暗色黑紫”）
+STYLE_TAIL = {
+    '扁平商业': '矢量扁平插画，几何构成，干净负空间，商业级配色，锐利边缘',
+    '三维写实': 'C4D 三维渲染，柔和影棚光，细腻材质质感，景深虚化',
+    '国潮': '传统纹样再设计，烫金描边，东方色谱，新旧融合的版式',
+    '极简': '大面积留白，单一视觉锤，克制两色配色，高级质感',
+    '酸性': '液态金属质感，霓虹光效，扭曲渐变，暗底高对比',
+    '涂鸦': '手绘笔触，喷溅肌理，街头涂鸦构成，粗轮廓线',
+    '像素': '8-bit 像素艺术，等距视角，有限色板，干净锯齿边缘',
+}
+
+NEGATIVE_PROMPT = ('低质量, 模糊, 变形, 畸形, 多余肢体, 错误解剖, 水印, '
+                   '签名, 乱码文字, 过曝, 噪点, 拼接痕迹, 画幅裁切')
+
+
+def _cut(text, limit=60):
+    """按标点截断到 limit 内，避免句子被硬切一半。"""
+    t = (text or '').strip()
+    if len(t) <= limit:
+        return t
+    t = t[:limit]
+    for punct in ('。', '；', '，'):
+        i = t.rfind(punct)
+        if i > 20:
+            return t[:i]
+    return t
+
+
+def _build_image_prompt(plan, style, user_prompt):
+    """由六维方案组装专业文生图提示词：主体 → 风格材质 → 构图光线 → 色彩。"""
+    parts = [plan.get('prompt') or user_prompt]
+    parts.append('%s风格，%s' % (style, STYLE_TAIL.get(style, '高完成度商业设计')))
+    compose = _cut(plan.get('compose'))
+    if compose:
+        parts.append(compose)
+    pal = plan.get('palette') or {}
+    swatches = pal.get('swatches') or []
+    if swatches:
+        parts.append('主色 %s，点睛色 %s' % (swatches[0], swatches[-1]))
+    highlight = _cut(plan.get('highlight'))
+    if highlight:
+        parts.append('记忆点细节：%s' % highlight)
+    parts.append('杰出设计作品，构图完整，细节精致，高清画质')
+    return '。'.join(p for p in parts if p)
+
 def _synth_svg(prompt, palette):
     """按提示词种子合成一张抽象流体 SVG（无外部生图服务时的演示生成图）。"""
     seed = int(hashlib.md5((prompt or 'frame').encode('utf-8')).hexdigest(), 16)
@@ -356,13 +401,12 @@ def generate(user):
                     % (GEN_TOKEN_COST, user.tokens))
     user.tokens -= GEN_TOKEN_COST
     plan = build_plan_ai(prompt, style, '创意概念平淡')
-    # 优先用 DashScope 文生图（以方案的提示词为基底，叠加风格）；
+    # 优先用 DashScope 文生图（由六维方案组装专业提示词）；
     # 不可用/失败时回退到本地 SVG 合成，保证生成永不中断。
-    img_prompt = '%s，%s风格，暗色黑紫艺术氛围，高质感' % (
-        plan.get('prompt') or prompt, style)
+    img_prompt = _build_image_prompt(plan, style, prompt)
     cover = ai_provider.text_to_image(
         img_prompt, current_app.config['UPLOAD_FOLDER'],
-        size='1024*1024')
+        size='1024*1024', negative_prompt=NEGATIVE_PROMPT)
     source = 'ai'
     if not cover:
         cover = _synth_svg(prompt, plan.get('palette', {}).get('swatches'))

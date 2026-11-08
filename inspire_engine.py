@@ -57,7 +57,13 @@ def build_plan(theme, style, pain):
 
 
 _AI_SYSTEM = (
-    '你是资深视觉创意总监，擅长为设计命题输出结构化创意方案。'
+    '你是一位有 15 年经验的资深视觉创意总监，先后服务于 4A 广告公司与头部'
+    '互联网大厂的设计中台，专长是商业平面、品牌视觉与插画艺术指导，'
+    '评审过数千份设计稿件。你的方案以「可直接落地」著称：每条建议都包含'
+    '具体的技法参数或可执行动作，而不是抽象形容词。'
+    '写作要求：使用设计师行业的专业术语（视觉锤、版式率、张力、负空间、'
+    '色彩心理、视觉动线、层级、调性），像在给下属做创意 Brief 一样输出；'
+    '禁止出现「高大上、美观、有设计感」这类空话。'
     '只输出一个 JSON 对象，不要任何解释文字或 markdown 代码块。'
 )
 
@@ -68,17 +74,28 @@ def build_plan_ai(theme, style, pain):
         return build_plan(theme, style, pain)
     swatches = STYLE_SWATCHES.get(style, STYLE_SWATCHES['扁平商业'])
     user_prompt = (
-        '创作主题：%s\n目标风格：%s\n当前痛点：%s\n\n'
-        '请输出 JSON，字段严格如下：\n'
-        '{"creative":"创意方向(60-120字)","style_rec":"风格建议(40-90字)",'
-        '"compose":"构图策略(40-90字)",'
-        '"palette":{"swatches":["#RRGGBB",...4个],"logic":"配色逻辑(30-60字)"},'
-        '"highlight":"画面亮点(30-70字)",'
-        '"pitfalls":["避坑1","避坑2","避坑3","避坑4"],'
-        '"prompt":"可直接投喂绘画模型的中文提示词(60-140字)"}'
-        % (theme, style, pain or '创意概念平淡'))
+        '创作主题：%s\n目标风格：%s\n当前痛点：%s\n'
+        '该风格参考色卡：%s\n\n'
+        '请先在心里推断：这个主题的商业场景（海报/包装/IP/新媒体封面…）与'
+        '目标受众，再据此输出方案。\n\n'
+        '输出 JSON，字段严格如下（全部用中文，每条建议必须落到具体技法）：\n'
+        '{"creative":"创意方向(80-150字)：先点明商业场景与受众，再给出核心创意'
+        '概念与叙事钩子",'
+        '"style_rec":"风格建议(60-120字)：风格骨架+异质化处理+材质/笔触/光效'
+        '的具体选择",'
+        '"compose":"构图策略(60-120字)：视角、主体占比、视觉动线、前中后层次、'
+        '负空间安排",'
+        '"palette":{"swatches":["#RRGGBB"共4个：基底色/主色/辅助色/点睛色，'
+        '可微调参考色卡但须成体系],"logic":"配色逻辑(40-80字)：比例分配+'
+        '色彩心理依据"},'
+        '"highlight":"画面亮点(40-90字)：一个会被记住的细节，说清位置与做法",'
+        '"pitfalls":["避坑1","避坑2","避坑3","避坑4"]（每条15-40字，针对该'
+        '主题的典型翻车点），'
+        '"prompt":"可直接投喂绘画模型的中文提示词(80-160字)：包含主题主体、'
+        '风格与材质、构图与光线、色彩与氛围，按重要性排序，术语专业"}'
+        % (theme, style, pain or '创意概念平淡', '、'.join(swatches)))
     data = ai_provider.chat_json(user_prompt, system=_AI_SYSTEM,
-                                 temperature=0.85, max_tokens=1400)
+                                 temperature=0.7, max_tokens=2000)
     plan = _normalize_plan(data, style, swatches)
     if not plan:
         return build_plan(theme, style, pain)
